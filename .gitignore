@@ -1,3 +1,15 @@
-build_database_script.py
-create_database_script.py
-claw-code/
+# Local data & build artifacts (do not commit)
+dataset/
+database/
+*.db
+*.npy
+*.pkl
+*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
