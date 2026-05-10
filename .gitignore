@@ -9,11 +9,13 @@ database/
 src/yolov8n-seg.pt
 src/processed_224_seg_yolo/
 src/seg_yolo_crop.py
+*.src/
 
 # Python
 __pycache__/
 *.py[cod]
 .venv/
+.idea/
 venv/
 .env
 .ipynb_checkpoints/
