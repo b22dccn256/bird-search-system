@@ -101,7 +101,8 @@ def create_foreground_mask(img: np.ndarray) -> np.ndarray:
     try:
         bgd = np.zeros((1, 65), dtype=np.float64)
         fgd = np.zeros((1, 65), dtype=np.float64)
-        margin = 10
+        margin = 20 
+# Tăng margin lên 20 để ôm sát chim hơn, GrabCut sẽ chạy nhanh và nét hơn (từ 10 -> 20)
         rect = (margin, margin, w - 2 * margin, h - 2 * margin)
         cv2.grabCut(img, mask_gc, rect, bgd, fgd, 5, cv2.GC_INIT_WITH_RECT)
         binary = np.where(
