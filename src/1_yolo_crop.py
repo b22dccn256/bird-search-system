@@ -10,7 +10,7 @@ RAW_DIR = "C:/Users/ADMIN/bird-search-system/bird-search-system/data/process_2" 
 PROCESSED_DIR = "C:/Users/ADMIN/bird-search-system/bird-search-system/data/processed_256"  # Thư mục lưu ảnh đã cắt
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
-TARGET_SIZE = (256, 256)
+TARGET_SIZE = (224, 2)
 processed_count = 0
 
 print("Bắt đầu tự động tìm và cắt chim...")
