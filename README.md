@@ -8,23 +8,24 @@ Hệ thống tìm kiếm chim dựa trên ảnh sử dụng machine learning đ�
 bird-search-system/
 │
 ├── data/
-│   ├── raw/                     # Ảnh gốc chưa xử lý
-│   ├── processed/               # Ảnh đã resize và lọc
-│   └── test_input/              # Ảnh dùng để kiểm thử
+│   ├── raw/                     # 500+ ảnh gốc (chưa xử lý)
+│   ├── processed/               # Ảnh đã resize, blur, tách nền
+│   └── test_input/              # Ảnh truy vấn mới (bạn tự chụp/tải)
 │
 ├── database/
-│   ├── birds.db                 # SQLite database
-│   ├── faiss.index              # FAISS index
-│   ├── features.npy             # Vector đặc trưng thô
-│   ├── features_scaled.npy      # Vector đã chuẩn hóa
-│   ├── scaler.pkl               # StandardScaler đã fit
-│   └── filenames.txt            # Danh sách tên file tương ứng
+│   ├── birds.db                 # SQLite: lưu metadata (tên, kích thước, đường dẫn)
+│   ├── faiss.index              # FAISS: chỉ mục vector để tìm kiếm siêu nhanh
+│   ├── features.npy             # Vector đặc trưng thô (trước khi chuẩn hóa)
+│   ├── scaler.pkl               # Model StandardScaler đã fit
+│   └── filenames.txt            # Ánh xạ index trong FAISS ↔ tên file ảnh
 │
 ├── src/
 │   ├── __init__.py
-│   ├── feature_extractor.py     # Các hàm trích đặc trưng
-│   ├── build_database.py        # Script xây dựng CSDL và FAISS
-│   └── search.py                # Hàm tìm kiếm
+│   ├── config.py                # Cấu hình đường dẫn & tham số
+│   ├── preprocessing.py         # Resize, Gaussian Blur, GrabCut
+│   ├── feature_extractor.py     # HSV + HOG + LBP trên lưới 4x4
+│   ├── build_database.py        # Pipeline xây dựng CSDL & FAISS index
+│   └── search_engine.py         # Logic tải index, chuẩn hóa query, tìm top-5
 │
 ├── notebooks/                   # (Tùy chọn) Jupyter notebooks
 │
