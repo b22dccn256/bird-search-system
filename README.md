@@ -118,6 +118,7 @@ bird-search-system/
 │   ├── database.db              # SQLite: Lưu metadata và đường dẫn ảnh chim
 │   ├── features.npy             # Ma trận đặc trưng đã giảm chiều (PCA 512-dim)
 │   ├── pca_model.pkl            # Model PCA đã lưu để dùng cho ảnh truy vấn
+│   └── features_all.csv         # CSV chứa đặc trưng thô (dùng để xử lí dữ liệu)
 │
 ├── .venv/                       # Môi trường ảo Python (Virtual Environment)
 ├── 0_yolo_crop.py               # Tiền xử lý: Dùng YOLOv8 để crop đối tượng chim
