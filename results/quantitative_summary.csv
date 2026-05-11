@@ -1,0 +1,2 @@
+config_name,label_mode,query_mode,num_queries,P@1,R@1,mAP@1,P@5,R@5,mAP@5,P@10,R@10,mAP@10,P@20,R@20,mAP@20,search_ms_mean,extract_ms_mean,pca_ms_mean,total_ms_mean
+C0_full,parent,extract,100,1.000000,0.000803,1.000000,1.000000,0.004016,1.000000,1.000000,0.008032,1.000000,1.000000,0.016064,1.000000,0.773,6307.705,0.878,6309.356
