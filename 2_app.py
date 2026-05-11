@@ -20,11 +20,16 @@ import os
 import pickle
 import sqlite3
 import tempfile
+from typing import Any, Optional
 
 import numpy as np
 import streamlit as st
 from PIL import Image
 from scipy.spatial.distance import cdist
+try:
+    import faiss  # type: ignore
+except Exception:
+    faiss = None
 
 from feature_extractors import extract_raw_features
 
@@ -35,6 +40,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database", "database.db")
 FEATURES_PATH = os.path.join(BASE_DIR, "database", "features.npy")
 PCA_PATH = os.path.join(BASE_DIR, "database", "pca_model.pkl")
+FAISS_PATH = os.path.join(BASE_DIR, "database", "faiss.index")
 
 
 # -----------------------------------------------------------------------
@@ -42,7 +48,7 @@ PCA_PATH = os.path.join(BASE_DIR, "database", "pca_model.pkl")
 # -----------------------------------------------------------------------
 @st.cache_resource
 def load_resources():
-    """Load feature matrix, PCA model, và danh sách image paths."""
+    """Load resources for search: features, PCA, image paths, optional FAISS."""
     features = np.load(FEATURES_PATH).astype(np.float64)
 
     with open(PCA_PATH, "rb") as f:
@@ -55,7 +61,16 @@ def load_resources():
     conn.close()
 
     paths = [row[1] for row in rows]
-    return features, pca, paths
+    index = None
+    use_faiss = False
+    if faiss is not None and os.path.exists(FAISS_PATH):
+        try:
+            index = faiss.read_index(FAISS_PATH)
+            use_faiss = index.ntotal == len(paths)
+        except Exception:
+            index = None
+            use_faiss = False
+    return features, pca, paths, index, use_faiss
 
 
 # -----------------------------------------------------------------------
@@ -64,12 +79,66 @@ def load_resources():
 def search_topk(
     query_vec: np.ndarray,
     db_matrix: np.ndarray,
+    faiss_index: Optional[Any] = None,
+    use_faiss: bool = False,
     top_k: int = 5,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Cosine distance -> top-k nearest indices & distances."""
+    """Top-k search by cosine distance (FAISS IndexFlatIP if available)."""
+    if use_faiss and faiss is not None and faiss_index is not None:
+        q = query_vec.reshape(1, -1).astype(np.float32)
+        faiss.normalize_L2(q)
+        scores, idx = faiss_index.search(q, top_k)
+        idx = idx.flatten()
+        scores = scores.flatten().astype(np.float64)
+        dists = 1.0 - scores
+        valid = idx >= 0
+        return idx[valid], dists[valid]
+
     dists = cdist(query_vec.reshape(1, -1), db_matrix, metric="cosine").flatten()
     idx = np.argsort(dists)[:top_k]
     return idx, dists[idx]
+
+
+def build_comparison_rows(
+    query_vec: np.ndarray,
+    top_idx: np.ndarray,
+    top_dist: np.ndarray,
+    db_matrix: np.ndarray,
+    image_paths: list[str],
+) -> list[dict[str, Any]]:
+    """Tạo các dòng so sánh chỉ số giữa ảnh query và top-k kết quả."""
+    q = query_vec.reshape(-1).astype(np.float64)
+    rows: list[dict[str, Any]] = []
+
+    # Query row (mốc tham chiếu)
+    rows.append({
+        "Đối tượng": "Ảnh query",
+        "Tệp ảnh": "(uploaded)",
+        "Cosine Similarity (%)": 100.0,
+        "Cosine Distance": 0.0,
+        "Euclidean Distance": 0.0,
+        "L1 Distance": 0.0,
+        "Dot Product": float(np.dot(q, q)),
+        "L2 Norm": float(np.linalg.norm(q)),
+        "Feature Mean": float(np.mean(q)),
+        "Feature Std": float(np.std(q)),
+    })
+
+    for rank, (idx, cos_dist) in enumerate(zip(top_idx, top_dist), 1):
+        v = db_matrix[idx].reshape(-1).astype(np.float64)
+        rows.append({
+            "Đối tượng": f"Kết quả #{rank}",
+            "Tệp ảnh": os.path.basename(image_paths[idx]),
+            "Cosine Similarity (%)": float(max(0.0, 1.0 - cos_dist) * 100.0),
+            "Cosine Distance": float(cos_dist),
+            "Euclidean Distance": float(np.linalg.norm(q - v)),
+            "L1 Distance": float(np.sum(np.abs(q - v))),
+            "Dot Product": float(np.dot(q, v)),
+            "L2 Norm": float(np.linalg.norm(v)),
+            "Feature Mean": float(np.mean(v)),
+            "Feature Std": float(np.std(v)),
+        })
+    return rows
 
 
 # -----------------------------------------------------------------------
@@ -95,7 +164,7 @@ if not all(os.path.exists(p) for p in required):
     )
     st.stop()
 
-features, pca, image_paths = load_resources()
+features, pca, image_paths, faiss_index, use_faiss = load_resources()
 
 # --- Sidebar -----------------------------------------------------------
 st.sidebar.header("Cài đặt")
@@ -106,6 +175,8 @@ st.sidebar.markdown(
     f"**Database:** {len(image_paths)} ảnh\n\n"
     f"**Feature dim:** {features.shape[1]}"
 )
+engine = "FAISS IndexFlatIP (exact cosine)" if use_faiss else "SciPy brute-force cosine"
+st.sidebar.markdown(f"**Search engine:** {engine}")
 st.sidebar.markdown(
     "### Hướng dẫn\n"
     "1. Tải lên ảnh chim cần tìm kiếm.\n"
@@ -120,6 +191,9 @@ uploaded = st.file_uploader(
 )
 
 if uploaded is not None:
+    if "show_compare_table" not in st.session_state:
+        st.session_state["show_compare_table"] = False
+
     pil_img = Image.open(uploaded)
 
     col_q, col_r = st.columns([1, 3])
@@ -142,7 +216,20 @@ if uploaded is not None:
                 st.stop()
 
             query_pca = pca.transform(raw.reshape(1, -1)).astype(np.float64)
-            top_idx, top_dist = search_topk(query_pca, features, top_k=top_k)
+            top_idx, top_dist = search_topk(
+                query_pca,
+                features,
+                faiss_index=faiss_index,
+                use_faiss=use_faiss,
+                top_k=top_k,
+            )
+            comparison_rows = build_comparison_rows(
+                query_pca,
+                top_idx,
+                top_dist,
+                features,
+                image_paths,
+            )
     except Exception as exc:
         st.error(f"Lỗi xử lý: {exc}")
         st.stop()
@@ -175,3 +262,20 @@ if uploaded is not None:
                     st.warning(f"Không tìm thấy:\n{rel_path}")
                 st.caption(f"**#{i + 1}**  —  {sim:.1f}% tương tự")
                 st.caption(os.path.basename(rel_path))
+
+    st.markdown("---")
+    btn_label = (
+        "Ẩn bảng so sánh chỉ số"
+        if st.session_state["show_compare_table"]
+        else "Hiển thị bảng so sánh chỉ số"
+    )
+    if st.button(btn_label, key="toggle_compare_table"):
+        st.session_state["show_compare_table"] = not st.session_state["show_compare_table"]
+
+    if st.session_state["show_compare_table"]:
+        st.subheader("Bảng so sánh chỉ số (query vs top-k)")
+        st.caption(
+            "Bảng gồm cosine similarity, cosine distance, khoảng cách Euclidean/L1 "
+            "và một số thống kê vector đặc trưng."
+        )
+        st.dataframe(comparison_rows, use_container_width=True)

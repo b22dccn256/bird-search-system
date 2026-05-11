@@ -28,6 +28,10 @@ import time
 
 import numpy as np
 from sklearn.decomposition import PCA
+try:
+    import faiss  # type: ignore
+except Exception:
+    faiss = None
 
 from feature_extractors import extract_raw_features
 
@@ -41,6 +45,7 @@ DB_PATH = os.path.join(OUTPUT_DIR, "database.db")
 FEATURES_PATH = os.path.join(OUTPUT_DIR, "features.npy")
 RAW_FEATURES_PATH = os.path.join(OUTPUT_DIR, "raw_features.npy")
 PCA_PATH = os.path.join(OUTPUT_DIR, "pca_model.pkl")
+FAISS_PATH = os.path.join(OUTPUT_DIR, "faiss.index")
 PCA_COMPONENTS = 512
 CHECKPOINT_EVERY = 20
 
@@ -78,6 +83,22 @@ def collect_images(folder: str) -> list[str]:
             if os.path.splitext(f)[1].lower() in SUPPORTED_EXT:
                 paths.append(os.path.join(root, f))
     return paths
+
+
+def build_faiss_index_ip(features_pca: np.ndarray, index_path: str) -> bool:
+    """Build exact cosine index via IndexFlatIP on L2-normalized vectors."""
+    if faiss is None:
+        print("[WARN] FAISS is not available. Skip building faiss.index.")
+        print("       Install: pip install faiss-cpu")
+        return False
+
+    x = features_pca.astype(np.float32).copy()
+    faiss.normalize_L2(x)
+    dim = x.shape[1]
+    index = faiss.IndexFlatIP(dim)
+    index.add(x)
+    faiss.write_index(index, index_path)
+    return True
 
 
 # -----------------------------------------------------------------------
@@ -197,7 +218,7 @@ def main() -> None:
 
     # --- Save ---------------------------------------------------------
     print(f"\n{'-' * 60}")
-    print(f"  STEP 3/3 -- Save to '{OUTPUT_DIR}'")
+    print(f"  STEP 3/4 -- Save features/PCA to '{OUTPUT_DIR}'")
     print(f"{'-' * 60}")
 
     np.save(FEATURES_PATH, X_pca.astype(np.float32))
@@ -206,6 +227,14 @@ def main() -> None:
     with open(PCA_PATH, "wb") as f:
         pickle.dump(pca, f)
     print(f"  pca_model.pkl  : saved")
+
+    # --- FAISS index ---------------------------------------------------
+    print(f"\n{'-' * 60}")
+    print("  STEP 4/4 -- Build FAISS IndexFlatIP (exact cosine)")
+    print(f"{'-' * 60}")
+    ok_faiss = build_faiss_index_ip(X_pca, FAISS_PATH)
+    if ok_faiss:
+        print("  faiss.index    : saved")
 
     conn.close()
     print(f"  database.db    : {len(all_feats)} records")
