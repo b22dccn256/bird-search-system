@@ -5,8 +5,8 @@ from ultralytics import YOLO
 # Tải mô hình YOLOv8 thu nhỏ (tự động tải về, chạy rất nhẹ)
 print("Đang tải mô hình YOLOv8...")
 model = YOLO('yolov8n.pt')
-RAW_DIR = "C:/Users/ADMIN/bird-search-system/bird-search-system/data/process_loc_tay"  # Thư mục chứa 1200 ảnh bạn đã lọc
-PROCESSED_DIR = "C:/Users/ADMIN/bird-search-system/bird-search-system/dataset"  # Thư mục lưu ảnh đã cắt
+RAW_DIR = "C:/Bird-Search-System/bird-search-system/data/process_loc_tay"  # Thư mục chứa 1200 ảnh bạn đã lọc
+PROCESSED_DIR = "C:/Bird-Search-System/bird-search-system/dataset"  # Thư mục lưu ảnh đã cắt
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 TARGET_SIZE = (224, 224)
 processed_count = 0
