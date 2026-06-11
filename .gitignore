@@ -9,3 +9,4 @@ venv/
 .idea/
 .tailieu_md/
 debug_grabcut_preview.py
+.result_grabcut/

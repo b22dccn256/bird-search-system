@@ -1,0 +1,642 @@
+﻿HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG khung doi 
+KHOA CÔNG NGHỆ THÔNG TIN 1
+
+
+  
+
+BÁO CÁO BÀI TẬP LỚN
+
+
+ĐỀ TÀI: XÂY DỰNG HỆ THỐNG CSDL 
+ĐA PHƯƠNG TIỆN VÀ TRUY XUẤT ẢNH CHIM 
+
+
+Nhóm thực hiện: 11
+THÀNH VIÊN THỰC HIỆN 
+1. Nguyễn Duy Hà - B22DCCN256
+2. Nguyễn Mạnh Tuấn - B22DCCN760
+3. Trần Trọng Thái - B22DCCN784
+Giảng viên hướng dẫn: Nguyễn Đình Hóa
+
+
+
+
+
+
+Hà Nội – 05/2026
+LỜI CẢM ƠN
+Chúng em xin bày tỏ lòng biết ơn sâu sắc đến các thầy cô giáo tại Học viện Công nghệ Bưu chính Viễn thông, đặc biệt là các thầy cô trong Khoa Công nghệ thông tin, vì sự tận tâm giảng dạy và truyền đạt cho chúng em những kiến thức, kinh nghiệm quý báu trong suốt quá trình học tập.
+Đặc biệt, chúng em xin gửi lời cảm ơn chân thành nhất đến Thầy Nguyễn Đình Hóa – giảng viên bộ môn Hệ Cơ sở dữ liệu Đa phương tiện. Thầy đã nhiệt tình hướng dẫn, hỗ trợ và chỉ bảo chúng em trong suốt quá trình thực hiện bài tập lớn. Trong thời gian học tập và trao đổi cùng Thầy, chúng em không chỉ thu nhận được nhiều kiến thức chuyên môn bổ ích mà còn học hỏi được tinh thần làm việc nghiêm túc cùng thái độ nghiên cứu khoa học hiệu quả. Những điều kiện này chắc chắn sẽ là hành trang vô cùng quý giá cho chúng em trong tương lai.
+Tuy đã có nhiều cố gắng, nhưng do thời gian và kiến thức còn hạn chế nên bài báo cáo chắc chắn không tránh khỏi những thiếu sót. Chúng em rất mong nhận được sự góp ý, chỉ bảo thêm của Thầy để hệ thống được hoàn thiện hơn.
+Một lần nữa, chúng em xin kính chúc Thầy luôn dồi dào sức khỏe và gặt hái được nhiều thành công trong sự nghiệp giảng dạy!
+________________
+
+
+MỤC LỤC
+CHƯƠNG 1. MỞ ĐẦU        3
+1.1. Mục tiêu của đề tài        3
+1.2. Đối tượng và phạm vi nghiên cứu        4
+a. Đối tượng nghiên cứu        4
+b. Phạm vi nghiên cứu        4
+1.3. Phương pháp thực hiện        5
+a. Phương pháp thu thập và tiền xử lý dữ liệu        5
+b. Phương pháp biểu diễn và tổ hợp đặc trưng (Feature Engineering & Fusion)        5
+c. Phương pháp quản lý CSDL và tối ưu không gian tìm kiếm        5
+d. Phương pháp truy xuất và đánh giá hệ thống        6
+e. Công cụ và môi trường phát triển        6
+CHƯƠNG 2: CƠ SỞ LÝ THUYẾT VÀ ĐẶC TRƯNG SỬ DỤNG        7
+2.1. Tổng quan về CBIR (Content-Based Image Retrieval)        7
+2.1.1. Định nghĩa và nguyên lý hoạt động        7
+2.1.2. Kiến trúc & Quy trình thực thi trong đề tài        7
+2.2. Tiền xử lý ảnh        8
+2.2.1. Chuẩn bị dữ liệu - Phát hiện và định vị chim bằng YOLOv8        8
+2.2.2. Chuẩn hóa hình học với Smart Padding và BORDER_REPLICATE        9
+Giai đoạn 1: Square Padding với BORDER_REPLICATE        9
+Giai đoạn 2: Context Expansion Padding        9
+2.2.3. Resize chuẩn hóa và bảo toàn chất lượng        9
+2.3. Đặc trưng màu sắc (Color Features)        10
+2.3.1. Chuyển đổi không gian màu        11
+2.3.2. Histogram màu toàn cục với chuẩn hóa L1        12
+2.3.3. Mô-men màu        13
+2.3.4. Histogram theo bố cục không gian        14
+2.4. Đặc trưng kết cấu        15
+2.4.1. Local Binary Pattern (LBP)        16
+2.4.2. Edge Orientation Histogram (EOH)        16
+2.4.3. GLCM và đặc trưng Haralick        17
+2.4.4. HOG        17
+2.4.5. Gabor        18
+2.4.6. Stripe FFT        18
+2.5. Đặc trưng hình dạng        19
+2.5.1. Mô-men Hu và các đại lượng vô hướng        20
+2.5.2. Mặt nạ lưới        21
+2.5.3. Chữ ký bán kính        21
+2.5.4. Width Profile và Contour Profile        21
+2.5.5. Đặc trưng HOG trên vùng Foreground        22
+2.6. Đo khoảng cách và tổ hợp        22
+2.6.2. Chuẩn hóa Z-score và Giảm chiều PCA        23
+2.6.3. Khoảng cách Cosine và Truy vấn top-k        23
+CHƯƠNG 3: HỆ THỐNG VÀ CƠ SỞ DỮ LIỆU        24
+3.1. Kiến trúc tổng thể        24
+3.3.1. Các thành phần chính        24
+3.3.2. Luồng dữ liệu tổng quan        25
+3.2. Schema cơ sở dữ liệu        26
+3.2.1. Bảng dữ liệu        26
+3.2.2. Mô hình lưu trữ kết hợp        26
+3.2.3. Quan hệ logic giữa các tệp        26
+3.3. Sơ đồ khối quy trình tìm kiếm        27
+3.3.1. Sơ đồ khối giai đoạn Offline        27
+3.3.2. Sơ đồ khối giai đoạn Online        29
+3.3.3. Mô tả thuật toán truy vấn        30
+3.4. Các kỹ thuật tối ưu hóa        31
+3.4.1. Tiền xử lý Offline thay vì tính toán Online        31
+3.4.2. Giảm chiều dữ liệu PCA để tối ưu tốc độ và bộ nhớ        31
+3.4.3. Cơ chế Resume/Checkpoint khi trích xuất Offline        31
+3.4.4. Tối ưu truy xuất tài nguyên trong ứng dụng web        32
+3.4.5. Xử lý ngoại lệ và an toàn số học        32
+3.4.6. Tiền xử lý Mask để gia tăng độ thuần khiết của đặc trưng        32
+3.4.7. Giới hạn tối ưu hiện tại và hướng mở rộng        32
+3.5. Ứng dụng demo        33
+3.5.1. Chức năng chính        33
+3.5.2. Quy trình xử lý trong giao diện        33
+3.5.3. Giá trị trình diễn và khả năng mở rộng        34
+CHƯƠNG 4: THỰC NGHIỆM VÀ ĐÁNH GIÁ        34
+4.1. Giao thức đánh giá và Dữ liệu thực nghiệm        34
+4.2. Các chỉ số đo lường và Kịch bản kiểm thử        34
+4.3. Phân tích vi mô và Đánh giá định tính        35
+4.4. Quy trình Tra cứu và Hiển thị Kết quả Tổng quan        35
+CHƯƠNG 5: KẾT LUẬN        37
+CHƯƠNG 6: HƯỚNG PHÁT TRIỂN        38
+6.1. Cải thiện chất lượng mặt nạ và tiền xử lý        38
+6.2. Tăng cường tính bất biến của đặc trưng        38
+6.3. Tối ưu hóa trọng số tổ hợp        39
+6.4. Mở rộng sang các loại dữ liệu khác        39
+TÀI LIỆU THAM KHẢO        40
+CHƯƠNG 1. MỞ ĐẦU
+1.1. Mục tiêu của đề tài
+Mục tiêu tổng quát: Xây dựng một hệ thống cơ sở dữ liệu (CSDL) đa phương tiện hoàn chỉnh và công cụ truy xuất hình ảnh chim dựa trên nội dung (Content-Based Image Retrieval – CBIR), cho phép lưu trữ có cấu trúc, quản lý siêu dữ liệu và tìm kiếm nhanh chóng các hình ảnh có nội dung thị giác tương đồng mà không phụ thuộc vào chú thích văn bản thủ công.
+Mục tiêu cụ thể:  
+1. Xây dựng bộ dữ liệu chuẩn hóa: Sưu tầm và tiền xử lý 1200 ảnh chim khác nhau, đảm bảo các ảnh có cùng kích thước, tỉ lệ khung hình đối tượng thống nhất, chim ở trạng thái đậu (không bay) và cùng góc chụp ngang, tạo nền tảng dữ liệu sạch cho quá trình trích xuất đặc trưng.
+2. Thiết kế bộ thuộc tính đặc trưng đa phương thức: Nghiên cứu và lựa chọn tập hợp các đặc trưng thị giác (màu sắc, hình dáng, kết cấu) kết hợp với kỹ thuật chia lưới không gian 4×4 để biểu diễn nội dung ảnh thành vector toán học, đồng thời phân tích rõ lý do lựa chọn và giá trị thông tin của từng thuộc tính trong việc phân biệt sự tương đồng/khác biệt giữa các loài chim.
+3. Xây dựng hệ CSDL quản lý siêu dữ liệu & cơ chế truy xuất: Thiết kế kiến trúc CSDL kết hợp giữa quan hệ truyền thống (SQLite) cho siêu dữ liệu và chỉ mục vector hiện đại (FAISS) cho đặc trưng hình ảnh. Trình bày cơ chế tìm kiếm dựa trên độ tương đồng cosine trong không gian đa chiều đã được giảm chiều và chuẩn hóa.
+4. Phát triển hệ thống truy xuất Top-5 tương đồng: Hiện thực hóa pipeline xử lý ảnh truy vấn (kể cả ảnh mới ngoài CSDL), trích xuất đặc trưng đồng nhất, tính toán độ tương đồng và trả về 5 ảnh kết quả xếp theo thứ tự giảm dần, kèm theo sơ đồ khối hệ thống và phân tích các kết quả trung gian tại mỗi bước.
+5. Demo và đánh giá hệ thống: Triển khai giao diện người dùng trực quan, tiến hành kiểm thử thực nghiệm với các bộ ảnh truy vấn đại diện, đánh giá định tính và định lượng kết quả dựa trên các chỉ số Precision, Recall, thời gian phản hồi và hiệu quả nén dữ liệu sau PCA.
+1.2. Đối tượng và phạm vi nghiên cứu
+a. Đối tượng nghiên cứu  
+* Dữ liệu đa phương tiện dạng hình ảnh tĩnh về các loài chim.
+* Các đặc trưng thị giác nội tại (Visual Features): phân bố màu sắc (HSV), gradient hướng cạnh (HOG), mẫu nhị phân địa phương (LBP) và cấu trúc không gian cục bộ.
+* Các thuật toán tiền xử lý, trích xuất đặc trưng, giảm chiều dữ liệu, đo lường độ tương đồng và lập chỉ mục vector tốc độ cao.
+* Kiến trúc hệ thống CSDL đa phương tiện kết hợp quản lý siêu dữ liệu quan hệ và truy xuất dựa trên nội dung.
+b. Phạm vi nghiên cứu 
+* Về dữ liệu: Sử dụng bộ dataset mở CUB-200-2011 làm nguồn chính, lọc và chuẩn hóa khoảng 1.200 ảnh thỏa mãn tiêu chí: chim đang đậu, góc chụp ngang, nền tương đối đơn giản. Toàn bộ ảnh được resize về kích thước thống nhất 224×224 pixels và áp dụng chuẩn hóa tỉ lệ đối tượng.
+* Về kỹ thuật: Tập trung vào phương pháp CBIR dựa trên đặc trưng thủ công (handcrafted features) kết hợp học máy cổ điển. Pipeline bao gồm: tách nền GrabCut (GMM), trích xuất đặc trưng đa kênh trên lưới 4×4, tổ hợp sớm (Early Fusion), chuẩn hóa L2, giảm chiều bằng PCA xuống tối đa 512 thành phần chính nhằm giải quyết lời nguyền số chiều và giảm dung lượng lưu trữ  và lập chỉ mục FAISS. Hệ thống sử dụng mô hình pre-trained YOLOv8n nhẹ (~3.2MB) chỉ cho bước tiền xử lý phát hiện vùng chim, phần trích xuất đặc trưng và truy xuất vẫn dựa hoàn toàn trên Computer Vision cổ điển để đảm bảo tính minh bạch.
+* Về ứng dụng: Hệ thống được thiết kế cho bài toán truy xuất tương đồng nội dung thị giác, không nhằm mục đích phân loại loài chim tự động hay nhận diện danh tính cá thể. Phạm vi triển khai ở mức prototype/web-app cục bộ, phù hợp cho nghiên cứu, giảng dạy và quản lý bộ sưu tập ảnh quy mô nhỏ-trung bình.
+* Giới hạn: Hệ thống tối ưu cho ảnh tĩnh, góc ngang, tư thế đậu. Không xử lý video, ảnh chim đang bay, góc chụp cực đoan, vật thể bị che khuất >50% hoặc điều kiện ánh sáng quá tối/chói làm mất đặc trưng kết cấu.
+1.3. Phương pháp thực hiện
+Đề tài được triển khai theo phương pháp kết hợp giữa nghiên cứu lý thuyết và phát triển hệ thống thực nghiệm, cụ thể qua 5 nhóm phương pháp chính tương ứng với yêu cầu đề bài:
+a. Phương pháp thu thập và tiền xử lý dữ liệu  
+Sử dụng kỹ thuật lọc có điều kiện từ dataset mở, kết hợp script Python tự động hóa quy trình chuẩn hóa kích thước, áp dụng bộ lọc Gaussian Blur để khử nhiễu tần số cao, và thuật toán GrabCut (dựa trên Gaussian Mixture Model) để tách tiền cảnh/hậu cảnh. Phương pháp này đảm bảo đặc trưng chỉ được trích xuất trên vùng đối tượng chim, loại bỏ nhiễu nền như bầu trời, cành cây.
+b. Phương pháp biểu diễn và tổ hợp đặc trưng (Feature Engineering & Fusion)
+* Áp dụng kỹ thuật chia lưới không gian 4×4 (16 ô cục bộ) để bảo toàn thông tin vị trí tương đối. Tại mỗi ô, hệ thống trích xuất song song 3 loại đặc trưng:  
+* HSV Histogram: Phân bố tần suất màu sắc độc lập với cường độ ánh sáng, nhạy cảm với sắc tố lông.  
+* HOG: Thống kê gradient hướng cạnh, phác thảo đường viền mỏ, đuôi, chân và tư thế đậu.  
+* LBP: Mã hóa quan hệ cường độ điểm ảnh lân cận, phát hiện vân lông đốm/sọc/vảy.  
+* Các vector được ghép nối (Early Fusion), chuẩn hóa L2 để đưa về cùng thang đo, tạo thành vector đặc trưng toàn cục cho mỗi ảnh.
+c. Phương pháp quản lý CSDL và tối ưu không gian tìm kiếm
+Siêu dữ liệu (tên file, kích thước, đường dẫn, thời gian xử lý) được lưu trữ có cấu trúc trên SQLite. Dữ liệu vector được xử lý bằng StandardScaler và giảm chiều bằng PCA xuống 512 thành phần chính, giữ lại >85% phương sai nhằm giải quyết "lời nguyền số chiều" và giảm dung lượng lưu trữ. Chỉ mục FAISS (IndexFlatIP) được xây dựng để hỗ trợ truy vấn tích vô hướng (tương đương Cosine Similarity khi vector đã chuẩn hóa) với độ trễ dưới 0.01 giây.
+d. Phương pháp truy xuất và đánh giá hệ thống
+Ảnh truy vấn mới được đưa qua cùng pipeline tiền xử lý và trích xuất đặc trưng. Độ tương đồng được tính bằng khoảng cách Cosine, hệ thống sắp xếp giảm dần và trả về Top-5 kết quả. Đánh giá được thực hiện song song:  
+* Định tính: Quan sát trực quan kết quả demo, phân tích tính hợp lý của thứ tự xếp hạng và khả năng tổng quát hóa với ảnh ngoài CSDL.  
+* Định lượng: Tính toán Precision, Recall, thời gian phản hồi trung bình (ms/ảnh), tỷ lệ nén vector sau PCA và phân tích ma trận kết quả trung gian (vector thô → vector PCA → độ tương đồng).
+e. Công cụ và môi trường phát triển
+Ngôn ngữ lập trình Python, hệ sinh thái thư viện OpenCV, scikit-image, scikit-learn, FAISS, SQLite và Streamlit. Hệ thống được kiểm thử trên máy tính cá nhân cấu hình tiêu chuẩn, mã nguồn được modular hóa theo kiến trúc src/, đảm bảo tính tái lập, dễ bảo trì và mở rộng cho các tập dữ liệu đa phương tiện khác.
+
+
+________________
+
+
+CHƯƠNG 2: CƠ SỞ LÝ THUYẾT VÀ ĐẶC TRƯNG SỬ DỤNG
+2.1. Tổng quan về CBIR (Content-Based Image Retrieval)
+2.1.1. Định nghĩa và nguyên lý hoạt động
+CBIR (Content-Based Image Retrieval) là phương pháp truy xuất hình ảnh dựa trên phân tích các đặc trưng thị giác nội tại (Visual Features) của bức ảnh, thay vì phụ thuộc vào siêu dữ liệu văn bản (Text-Based Image Retrieval - TBIR). Hệ thống chuyển đổi thông tin hình ảnh thành các vector toán học đa chiều, sau đó sử dụng các độ đo khoảng cách để đánh giá mức độ tương đồng giữa ảnh truy vấn và ảnh trong cơ sở dữ liệu.
+2.1.2. Kiến trúc & Quy trình thực thi trong đề tài
+Hệ thống được thiết kế theo mô hình CBIR cổ điển (Classical Computer Vision), ưu tiên tính minh bạch và khả năng triển khai trên phần cứng tiêu chuẩn. Quy trình được chia thành hai giai đoạn: 
+a. Giai đoạn Offline (Xây dựng chỉ mục):
+* Tiền xử lý & phân vùng ảnh từ tập dữ liệu gốc.
+* Trích xuất đặc trưng đa phương thức.
+* Lưu siêu dữ liệu vào SQLite và vector đặc trưng vào tệp .npy.
+* Giảm chiều dữ liệu bằng PCA để khắc phục "lời nguyền số chiều", giảm dung lượng lưu trữ và tăng tốc độ truy vấn.
+* Xây dựng chỉ mục FAISS (IndexFlatIP) cho không gian vector đã chuẩn hóa.
+b. Giai đoạn Online (Truy xuất thời gian thực):
+* Người dùng tải ảnh truy vấn lên hệ thống.
+* Ảnh trải qua pipeline tiền xử lý & trích xuất đặc trưng đồng nhất với giai đoạn Offline.
+* Tính toán độ tương đồng Cosine giữa vector truy vấn và toàn bộ chỉ mục trong FAISS.
+* Sắp xếp giảm dần và trả về Top-5 kết quả có nội dung thị giác tương đồng nhất.
+2.2. Tiền xử lý ảnh
+Tiền xử lý đóng vai trò quyết định đến chất lượng đặc trưng đầu vào. Thay vì các phương pháp tách nền truyền thống dễ nhiễu, hệ thống áp dụng pipeline hiện đại kết hợp học sâu nhẹ (YOLOv8) và kỹ thuật padding thông minh, đảm bảo đối tượng chim được chuẩn hóa về vị trí, tỉ lệ và bối cảnh trước khi trích xuất đặc trưng. 
+2.2.1. Chuẩn bị dữ liệu - Phát hiện và định vị chim bằng YOLOv8
+Lý do lựa chọn: Thuật toán GrabCut truyền thống yêu cầu khởi tạo bounding box thủ công hoặc heuristic, dễ thất bại khi chim hòa lẫn nền phức tạp. YOLOv8 (You Only Look Once version 8) là mô hình phát hiện đối tượng thời gian thực với độ chính xác cao, khả năng tổng quát hóa tốt và phiên bản yolov8n (nano) chỉ ~3.2MB, phù hợp triển khai cục bộ.
+Cơ chế triển khai:
+* Hệ thống tải mô hình yolov8n.pt đã được huấn luyện trên dataset COCO (80 lớp).
+* Lọc đối tượng theo classes=[14] tương ứng với lớp bird trong COCO taxonomy.
+* Với mỗi ảnh đầu vào, mô hình trả về danh sách bounding box kèm độ tin cậy (confidence score).
+* Hệ thống chọn box có confidence cao nhất làm vùng quan tâm (Region of Interest - ROI):
+
+* Tọa độ box (x1,y1,x2,y2) được dùng để crop chính xác vùng chứa chim, loại bỏ hoàn toàn nhiễu nền không liên quan.
+  
+
+Hình 2.1. Ảnh sau khi được xử lý 
+2.2.2. Chuẩn hóa hình học với Smart Padding và BORDER_REPLICATE
+Việc resize trực tiếp ảnh crop về kích thước cố định sẽ làm biến dạng tỉ lệ cơ thể chim. Hệ thống áp dụng kỹ thuật Smart Padding hai giai đoạn:
+Giai đoạn 1: Square Padding với BORDER_REPLICATE
+* Tính kích thước cạnh lớn nhất: 
+max_dim = max⁡(h,w)
+* Tính toán viền bù để tạo ảnh vuông hoàn hảo:
+ , 
+* Sử dụng cv2.BORDER_REPLICATE thay vì zero-padding: pixel ở biên được nhân bản ra vùng đệm, giúp viền ảnh hòa trộn tự nhiên với bối cảnh gốc (bầu trời, cành cây), tránh tạo cạnh giả (artificial edges) gây nhiễu cho đặc trưng HOG/LBP.
+Giai đoạn 2: Context Expansion Padding
+* Nghiên cứu thực nghiệm cho thấy chim chiếm ~55% diện tích khung hình là tỉ lệ tối ưu để cân bằng giữa chi tiết đối tượng và thông tin bố cảnh phụ trợ.
+* Tính kích thước khung mở rộng:
+
+* Padding thêm viền đồng đều bốn phía để đạt target_dim, giữ chim ở trung tâm với bối cảnh mở rộng tự nhiên.
+2.2.3. Resize chuẩn hóa và bảo toàn chất lượng
+Ảnh vuông sau padding được resize về kích thước chuẩn [224×224] pixels sử dụng phép nội suy INTER_AREA:
+* INTER_AREA sử dụng resampling dựa trên vùng pixel, phù hợp nhất cho thao tác thu nhỏ ảnh (downsampling), giảm thiểu hiện tượng răng cưa và bảo toàn chi tiết kết cấu lông.
+* Kích thước 224×224 được lựa chọn vì: 
+* (1) tương thích với kiến trúc mạng học sâu nếu mở rộng trong tương lai 
+* (2) cân bằng giữa độ phân giải đủ để trích xuất đặc trưng và hiệu suất tính toán
+Sơ đồ pipeline tiền xử lý: 
+Ảnh gốc (H×W×3) – Ảnh raw (CUB-200-2011)
+↓
+[YOLOv8 Detection] → Bounding Box (x1,y1,x2,y2) + Confidence Score
+↓
+[Crop ROI] → Cắt vùng chứa chim (h×w×3)
+↓
+[GrabCut Segmentation] → Khởi tạo GC_INIT_WITH_RECT → Tinh chỉnh Mask GMM (5 iterations)
+↓
+[Background Removal] → Áp dụng Mask, chuyển nền thành trắng/đồng nhất (loại nhiễu nền)
+↓
+[Square Padding + BORDER_REPLICATE] → Cân đối tỉ lệ, tạo ảnh vuông
+↓
+[Context Expansion: ×1.35] → Mở rộng khung bối cảnh chuẩn (~55% đối tượng)
+↓
+[Resize INTER_AREA] → Chuẩn hóa kích thước 224×224 pixels
+↓
+[Output] → Ảnh sạch lưu vào processed_224 → Đẩy ảnh sang dataset/ (Sẵn sàng trích xuất đặc trưng)
+	Lưu ý: YOLOv8 chỉ dùng cho chuẩn hóa dữ liệu đầu vào, không tham gia trích xuất đặc trưng và tìm kiếm ảnh, GrabCut dùng cho tách foreground khi trích xuất đặc trưng. 
+2.3. Đặc trưng màu sắc (Color Features)
+Màu sắc là đặc trưng thị giác mạnh mẽ và trực quan nhất trong bài toán nhận diện và phân loại chim, do sự đa dạng về sắc tố lông giữa các loài. Tuy nhiên, màu sắc trong ảnh số thường bị ảnh hưởng bởi điều kiện ánh sáng, cân bằng trắng của camera và góc chụp. Hệ thống giải quyết bài toán này thông qua chuyển đổi không gian màu, chuẩn hóa xác suất, phân tích thống kê bậc cao và bảo toàn thông tin bố cục không gian.
+Trong pipeline offline (1_extract_offline.py), các đặc trưng màu sắc được trích xuất bởi hàm extract_raw_features() và tích hợp sớm (Early Fusion) với các đặc trưng kết cấu trước khi được giảm chiều bằng PCA.
+2.3.1. Chuyển đổi không gian màu
+Ảnh đầu vào sau khi được tiền xử lý (YOLOv8 crop + Smart Padding + resize 224×224) vẫn tồn tại trong không gian màu BGR mặc định của OpenCV. Để tăng tính bền vững và khả năng phân biệt, hệ thống chuyển đổi sang hai không gian màu bổ trợ:
+a. Không gian HSV (Hue, Saturation, Value)
+* Cơ chế: Tách biệt thông tin màu sắc (Hue, Saturation) khỏi cường độ sáng (Value).
+* Lý do lựa chọn: 
+* Kênh H (0°–180° trong OpenCV) phản ánh trực tiếp sắc tố lông đặc trưng của loài, bất biến với thay đổi độ sáng môi trường.
+* Kênh S đo độ đậm/nhạt của màu, hữu ích để phân biệt loài có màu chủ đạo tương tự nhưng khác độ bão hòa.
+* Kênh V được giữ lại làm đặc trưng phụ để phát hiện các vùng lông có độ tương phản sáng - tối đặc thù.
+* Công thức chuyển đổi (rút gọn):
+, nếu max = R
+, nếu max = G
+, nếu max = B
+b. Không gian màu CIELAB (Lab)
+* Cơ chế: Không gian màu perceptually uniform được chuẩn hóa bởi CIE, mô phỏng gần đúng cách mắt người cảm nhận màu sắc.
+* Lý do lựa chọn:
+* Kênh L (Lightness, 0–100) độc lập hoàn toàn với hai kênh màu a (trục xanh–đỏ) và b (trục vàng–xanh).
+* Khoảng cách Euclidean trong không gian Lab tương quan chặt chẽ với sự khác biệt màu sắc mà mắt người nhận thức được (Delta-E metric).
+* Giúp hệ thống phân biệt chính xác các loài có màu "trông giống nhau" trong RGB nhưng khác biệt trong nhận thức thị giác.
+Kết quả: Mỗi ảnh được biểu diễn đồng thời qua 6 kênh màu: [H, S, V, L, a, b], tạo nền tảng cho các bước trích xuất đặc trưng tiếp theo.
+2.3.2. Histogram màu toàn cục với chuẩn hóa L1
+Histogram màu là phương pháp thống kê tần suất xuất hiện của các mức giá trị pixel trong ảnh. Trong đề tài, histogram được tính toán trên toàn bộ vùng ảnh đã chuẩn hóa (224×224) cho cả 6 kênh màu.
+a. Cơ chế lượng tử hóa và đếm tần suất
+Mỗi kênh màu được lượng tử hóa thành 32 bins đồng đều. Giá trị histogram  tại bin thứ i của kênh c được tính bằng:
+
+,trong đó:
+* I(.) là hàm chỉ báo (indicator function), trả về 1 nếu điều kiện đúng, 0 nếu sai.
+*  là dải giá trị của kênh c (180 cho H, 256 cho S,V,L,a,b).
+*  là giá trị pixel tại tọa độ (x,y) của kênh c.
+b. Chuẩn hóa L1: Biến histogram thành phân bố xác suất
+Do pipeline tiền xử lý đảm bảo chim luôn chiếm ~55% khung hình, số pixel foreground tương đối đồng nhất giữa các ảnh. Tuy nhiên, để đảm bảo tính công bằng tuyệt đối khi so sánh, hệ thống áp dụng chuẩn hóa L1 đưa histogram về phân bố xác suất:
+
+(với  là hằng số nhỏ tránh chia cho 0)
+   * Ưu điểm của chuẩn hóa L1:
+   * Vector histogram sau chuẩn hóa có tổng bằng 1: 
+
+   * Cho phép so sánh trực tiếp bằng khoảng cách Cosine hoặc Chi-square mà không bị ảnh hưởng bởi kích thước tuyệt đối của đối tượng.
+   * Bất biến với phép nhân vô hướng (scaling-invariant), phù hợp với dữ liệu đã qua resize.
+   * Kích thước vector: 
+2.3.3. Mô-men màu 
+Histogram toàn cục có nhược điểm là bỏ qua thông tin thống kê bậc cao và dễ bị ảnh hưởng bởi nhiễu lượng tử do phân chia bins. Mô men màu khắc phục điều này bằng cách trích xuất các đặc trưng thống kê bậc 1, 2, 3 của phân phối màu trên toàn bộ ảnh.
+a. Ba mô men được sử dụng 
+Với mỗi kênh màu c, hệ thống tính toán:
+      1. Mean (Trung bình – Moment bậc 1):
+
+→ Phản ánh màu chủ đạo của kênh, nhạy cảm với sự thay đổi sắc tố tổng thể.
+      2. Standard Deviation (Độ lệch chuẩn – Moment bậc 2):
+
+→ Đo độ tương phản/phân tán của màu trong kênh. Giá trị lớn cho thấy màu sắc đa dạng, giá trị nhỏ cho thấy màu đồng nhất.
+      3. Skewness (Độ xiên – Moment bậc 3):
+
+→ Phát hiện tính bất đối xứng của phân bố màu. Hữu ích để phân biệt loài có vệt màu tập trung lệch về một phía cơ thể (ví dụ: chim có đốm màu chỉ ở cánh hoặc đuôi).
+,trong đó N = 224 x 224 = 50,176 là tổng số pixel,  là giá trị pixel thứ k của kênh c.
+b. Ưu điểm và tích hợp
+      * Kích thước vector: 
+      * Ưu điểm: 
+         * Cực kỳ compact, giảm đáng kể dung lượng lưu trữ.
+         * Bền vững với nhiễu lượng tử và thay đổi kích thước đối tượng.
+         * Tính toán nhanh, không phụ thuộc vào số lượng bins.
+         * Vai trò trong hệ thống: Bổ sung thông tin thống kê bậc cao mà histogram có thể bỏ sót, đặc biệt hiệu quả khi kết hợp với các đặc trưng không gian.
+2.3.4. Histogram theo bố cục không gian 
+Histogram toàn cục có nhược điểm cố hữu: mất hoàn toàn thông tin vị trí tương đối. Hai bức ảnh chim có cùng phân bố màu nhưng khác bố cục (ví dụ: chim đầu đỏ/bụng trắng vs chim đầu trắng/bụng đỏ) sẽ cho histogram gần như giống hệt nhau.
+a. Cơ chế chia lưới 4×4
+Hệ thống chia ảnh chuẩn 224×224 thành lưới đều 4x4, tạo ra 16 ô vuông con, mỗi ô có kích thước 56x56 pixels:
+┌─────┬─────┬─────┬─────┐
+│(0,0)       │(0,1)      │(0,2)       │(0,3)      │ ← Hàng trên: Đầu/Mỏ
+├─────┼─────┼─────┼─────┤
+│(1,0)       │(1,1)      │(1,2)       │(1,3)      │  ← Hàng giữa: Thân/Cánh
+├─────┼─────┼─────┼─────┤
+│(2,0)       │(2,1)      │(2,2)       │(2,3)      │  ← Hàng dưới: Bụng/Chân
+├─────┼─────┼─────┼─────┤
+│(3,0)       │(3,1)      │(3,2)       │(3,3)      │  ← Hàng cuối: Đuôi
+└─────┴─────┴─────┴─────┘
+b. Trích xuất Local HSV Histogram trên từng ô
+Tại mỗi ô  của lưới:
+         * Chỉ sử dụng không gian HSV (3 kênh) để giảm độ phức tạp tính toán.
+         * Lượng tử hóa mỗi kênh thành 8 bins (thay vì 32 bins như toàn cục) để tránh overfitting do số pixel trong ô nhỏ.
+         * Tính histogram cục bộ và áp dụng chuẩn hóa L1 tương tự mục 2.3.2.
+ 
+
+
+c. Kích thước và giá trị thông tin
+         * Kích thước vector: Tại mỗi ô, hệ thống trích xuất đồng thời HSV Histogram (8 bins × 3 kênh = 24 chiều) và LBP Histogram (10 bins, phương pháp uniform). 
+Tổng kích thước: 16 ô × (24 + 10) = 544 chiều. Việc kết hợp LBP giúp bổ sung thông tin kết cấu cục bộ, tăng khả năng phân biệt các loài có màu tương đồng nhưng khác vân lông. 
+         * Giá trị thông tin:
+         * Bảo toàn ánh xạ không gian tương đối: ô hàng trên cùng (~đầu/mỏ), ô giữa (~thân/cánh), ô dưới (~đuôi/chân).
+         * Kết hợp với pipeline tiền xử lý giữ chim ở trung tâm, hệ thống có thể phân biệt loài có cùng màu nhưng khác bố cục sắc tố.
+         * Ví dụ: Chim "Red-headed Woodpecker" (đầu đỏ, thân đen) và "Black-headed Gull" (đầu đen, thân trắng) sẽ có vector spatial layout khác biệt rõ rệt dù histogram toàn cục có thể tương đồng.
+2.4. Đặc trưng kết cấu
+Phân tích chuyên sâu về kiến trúc hệ thống trích xuất đặc trưng cho thấy sự hiện diện của sáu phương pháp phân tích ảnh phức hợp. Trong đó, các thuật toán bao gồm Local Binary Pattern (LBP), Edge Orientation Histogram (EOH), GLCM kết hợp đặc trưng Haralick, bộ lọc Gabor và phổ tần số Stripe FFT được thiết lập đóng vai trò nòng cốt trong không gian đặc trưng kết cấu. Riêng phương pháp Histogram of Oriented Gradients (HOG) vẫn được triển khai nhưng được hệ thống phân bổ vào nhóm đặc trưng hình dáng nhằm tối ưu hóa khả năng biểu diễn đường bao của đối tượng. 
+2.4.1. Local Binary Pattern (LBP)
+Nguyên lý hoạt động của Local Binary Pattern (LBP) dựa trên việc mã hóa các vi cấu trúc cục bộ xung quanh mỗi điểm ảnh thông qua phép so sánh cường độ sáng với các điểm lân cận. Cụ thể, với P điểm nằm trên một vòng tròn bán kính R, giá trị LBP tại điểm tâm c được xác định theo công thức: 
+
+Trong đó, hàm bước nhảy  nhận giá trị 1 nếu  và 0 nếu . Nhằm tối ưu hóa số lượng đặc trưng và tăng tính bền vững, hệ thống áp dụng cơ chế Uniform LBP, trong đó các mẫu có số lần chuyển đổi bit ít hơn hoặc bằng 2 được gom thành các dải tần riêng biệt, các mẫu phức tạp hơn được gộp chung vào một dải duy nhất. Với cấu hình tham số P=8 và R=1, thuật toán sinh ra một vector đặc trưng phân bố tần suất bao gồm 10 chiều, được chuẩn hóa theo tỷ lệ: 
+
+Phương pháp này thể hiện sự ưu việt trong việc nắm bắt các kết cấu vi mô như vân lông chim nhỏ, đồng thời duy trì sự ổn định tương đối trước những biến thiên chiếu sáng cục bộ. 
+2.4.2. Edge Orientation Histogram (EOH) 
+Phương pháp Edge Orientation Histogram được tích hợp nhằm mô tả sự phân bố của các hướng biên thông qua gradient ảnh. Hệ thống sử dụng toán tử Sobel kích thước 3 x 3 để trích xuất gradient theo hai phương ngang và dọc, tương ứng là  và . Từ đó, biên độ  và góc hướng  tại mỗi điểm ảnh được tính toán theo hệ phương trình: 
+
+
+Không gian góc hướng từ 0 độ đến 180 độ được lượng tử hóa thành 9 dải. Biểu đồ tần suất được xây dựng bằng cách tích lũy các giá trị biên độ vào dải hướng tương ứng, chỉ tính toán trên vùng tiền cảnh đã loại bỏ phông nền: 
+
+Sau khi chuẩn hóa, kết quả thu được là một vector 9 chiều. Kỹ thuật này giúp nhấn mạnh các định hướng cạnh chủ đạo của cánh hoặc mỏ chim, cung cấp lượng thông tin hình thái mà thuật toán LBP không thể biểu diễn một cách tường minh. 
+2.4.3. GLCM và đặc trưng Haralick
+Ma trận đồng xuất hiện mức xám (Gray-Level Co-occurrence Matrix - GLCM) phân tích xác suất xuất hiện đồng thời của các cặp mức xám ở một khoảng cách d và góc định hướng  xác định. Để tối ưu hóa quá trình tính toán, không gian màu xám của ảnh được lượng tử hóa từ 256 xuống còn L = 64 mức theo biểu thức: 
+
+Ma trận GLCM được thiết lập với khoảng cách d=1 trên bốn hướng cơ bản gồm 0, , , , có xét đến tính đối xứng và được chuẩn hóa tổng về 1. Dựa trên các ma trận này, hệ thống trích xuất bốn thuộc tính Haralick cốt lõi: Độ tương phản (Contrast), Độ đồng nhất (Homogeneity), Độ tương quan (Correlation) và Năng lượng (Energy). Các công thức tương ứng được định nghĩa lần lượt như sau: 
+
+
+
+
+
+
+Sự kết hợp của 4 thuộc tính trên 4 góc tạo thành một vector đặc trưng 16 chiều, mô tả sâu sắc các cấu trúc không gian bậc hai của bề mặt kết cấu như độ thô ráp và tính phân bố bề mặt lông. 
+2.4.4. HOG
+Mặc dù có chung nền tảng phân tích gradient với EOH, thuật toán HOG được kiến trúc hệ thống phân loại vào nhóm đặc trưng hình dáng. Vùng tiền cảnh của ảnh sau khi được cắt khung và thu phóng về kích thước 64x64 pixel sẽ được chia nhỏ thành các ô lưới kích thước 16x16 pixel. Tại mỗi ô, biểu đồ hướng với 9 dải phân cách được tính toán. Nhằm kiểm soát tác động của độ tương phản cục bộ, các ô được gộp thành khối 2x2 để thực hiện chuẩn hóa chéo khối theo tiêu chuẩn L2-Hys: 
+
+
+
+
+
+Theo sau đó là bước giới hạn phần tử lớn nhất và chuẩn hóa lại. Cấu hình này sinh ra 3 x 3 = 9 khối trên toàn khung ảnh, mỗi khối chứa 4 ô, tạo ra một không gian vector hình thái định hướng lớn gồm 324 chiều. HOG đóng vai trò như một cơ chế biểu diễn xuất sắc cấu trúc đường nét có định hướng, là cầu nối lý tưởng giữa đặc trưng kết cấu biên và hình dáng sinh học tổng quát của đối tượng. 
+2.4.5. Gabor
+Để phân tích các mẫu kết cấu lông chim phức tạp có tính chu kỳ và định hướng cao, hệ thống sử dụng ngân hàng bộ lọc Gabor hai chiều. Hàm nhân Gabor dạng phức mô phỏng phản ứng của tế bào thị giác được biểu diễn toán học như sau: 
+
+
+
+
+
+Với các hệ tọa độ xoay được xác định bởi  và  . Sau phép tích chập giữa ảnh và bộ lọc, hệ thống trích xuất biên độ của đáp ứng. Thuật toán triển khai 5 mức tần số không gian khác nhau kết hợp cùng 8 hướng góc. Tại mỗi đáp ứng của tổ hợp tần số và góc, hai đặc trưng thống kê gồm trung bình và độ lệch chuẩn của biên độ được trích xuất. Tổng hợp lại, ngân hàng Gabor tạo ra một vector 80 chiều, cho phép hệ thống nhận diện tinh tế các dải hoa văn có nhịp điệu không gian đa dạng. 
+2.4.6. Stripe FFT
+Cuối cùng, nhằm phân tách các thành phần chu kỳ toàn cục thường biểu hiện dưới dạng sọc vân mà các bộ phân tích cục bộ dễ bỏ sót, hệ thống thực hiện chuyển đổi ảnh tiền cảnh sang miền tần số. Phép biến đổi Fourier nhanh hai chiều được định nghĩa theo: 
+
+Sau quá trình dịch tâm phổ, biên độ không gian tần số được chuyển sang hệ logarit . Để tóm tắt năng lượng hướng kính, một mặt cắt bán kính được thiết lập bằng cách tính trung bình biên độ dọc theo các vòng tròn đồng tâm  xuất phát từ gốc tần số. Tín hiệu một chiều này được lấy mẫu lại thành 64 phần tử và chuẩn hóa chia cho giá trị cực đại của chính nó:
+ 
+Kết quả sinh ra là một vector 64 chiều, cung cấp năng lực biểu diễn các mô hình chu kỳ tổng quát, qua đó hoàn thiện một cách toàn diện khối đặc trưng kết cấu ảnh của hệ thống. 
+
+
+2.5. Đặc trưng hình dạng
+Hình dạng phản ánh cấu trúc hình học, tỉ lệ và đường bao của đối tượng chim trong ảnh. Trong bài toán tìm kiếm ảnh chim, đặc trưng hình dạng giúp hệ thống so sánh các ảnh dựa trên dáng thân, đầu, cánh, đuôi và phân bố foreground của con chim.
+Trong dự án, đặc trưng hình dạng được trích xuất từ mặt nạ foreground sau khi ảnh được resize về 224 x 224. Mặt nạ này được tạo bằng thuật toán GrabCut, sau đó làm sạch bằng các phép toán hình thái học. Hệ thống trích xuất sáu nhóm đặc trưng con, tạo thành vector hình dạng 527 chiều.
+  
+
+Hình 2.5: Mô phỏng thuật toán GrabCut
+2.5.1. Mô-men Hu và các đại lượng vô hướng
+Mô-men ảnh được dùng để mô tả sự phân bố không gian của các pixel foreground trong mặt nạ. Với mặt nạ nhị phân M(x,y), mô-men không gian bậc (p,q) được tính như sau:
+
+Bảy mô-men Hu là các tổ hợp đa thức của   , bất biến với phép tịnh tiến, xoay và tỉ lệ. Các giá trị được biến đổi log-scale:
+sign( ) . log(|| + )
+Ngoài 7 mô-men Hu, hệ thống tính thêm 4 đại lượng vô hướng từ contour lớn nhất:
+         * Area Ratio: tỉ lệ diện tích foreground so với toàn bộ ảnh
+AreaRatio = 
+         * Perimeter norm: chu vi contour được chuẩn hóa theo kích thước ảnh
+PerimeterNorm = 
+         * Compactness: đo mức độ gọn của hình dạng. Giá trị càng lớn thì đường bao càng phức tạp
+Compactness = 
+         * Circularity: đo mức độ gần giống hình tròn. Giá trị càng gần 1 thì hình dạng càng tròn
+Circularity = 1 / Compactness
+trong đó:
+         * A: diện tích contour
+         * P: chu vi contour
+         * H, W: chiều cao và chiều rộng ảnh
+→ Tổng 7 Hu Mô-men + 4 đại lượng vô hướng = 11 chiều
+2.5.2. Mặt nạ lưới
+Mặt nạ foreground được chia thành lưới 8 x 8, tương ứng với 64 ô nhỏ. Với mỗi ô, hệ thống tính tỉ lệ pixel foreground trong ô đó so với tổng số pixel của ô. Giá trị này cho biết mức độ xuất hiện của đối tượng chim tại từng vùng không gian trong ảnh.
+Đặc trưng mặt nạ lưới có vai trò mô tả hình bóng tổng quát của chim. Nếu phần thân chim nằm ở giữa ảnh, phần đầu nằm lệch sang một bên và phần đuôi kéo dài sang phía còn lại, các ô trong lưới sẽ ghi nhận sự phân bố này thông qua mật độ foreground khác nhau. Vì chỉ lưu mật độ theo từng ô, đặc trưng này tương đối đơn giản, tính toán nhanh và ít nhạy hơn với nhiễu nhỏ trên đường biên.
+Tổng cộng: 64 chiều.
+2.5.3. Chữ ký bán kính
+Chữ ký bán kính mô tả đường bao của đối tượng dựa trên khoảng cách từ tâm khối đến các điểm contour. Hệ thống lấy contour lớn nhất, tính khoảng cách từ tâm đến từng điểm trên contour, sắp xếp theo góc và nội suy thành 64 giá trị.
+Vector bán kính được chuẩn hóa theo giá trị lớn nhất để giảm ảnh hưởng của kích thước đối tượng. Đặc trưng này giúp biểu diễn dáng tổng thể của chim, đặc biệt là các phần nhô ra như đầu, mỏ, cánh hoặc đuôi.
+Tổng cộng: 64 chiều.
+2.5.4. Width Profile và Contour Profile
+Hai profile này mô tả sự thay đổi hình bóng của chim theo từng lát cắt của mặt nạ foreground.
+Width Profile xét từng hàng của mask, tính độ rộng foreground tại mỗi hàng, sau đó chuẩn hóa và lấy mẫu về 32 giá trị. Đặc trưng này phản ánh sự thay đổi độ rộng của chim theo chiều dọc.
+Contour Profile xét từng cột của mask, tính chiều cao foreground tại mỗi cột, sau đó chuẩn hóa và lấy mẫu về 32 giá trị. Đặc trưng này phản ánh sự thay đổi hình dạng theo chiều ngang, giúp mô tả vùng đầu, thân, cánh và đuôi.
+Tổng cộng: 32 + 32 = 64 chiều.
+2.5.5. Đặc trưng HOG trên vùng Foreground
+Dự án sử dụng HOG, viết tắt của Histogram of Oriented Gradients, để mô tả cấu trúc cạnh và đường nét của chim. Trước khi tính HOG, hệ thống tìm bounding box quanh foreground, crop vùng chứa chim từ ảnh grayscale và resize về 64 x 64.
+Ảnh crop được chia thành các cell 16 x 16. Với mỗi cell, hệ thống thống kê hướng gradient thành 9 nhóm hướng; các block 2 x 2 cell được chuẩn hóa bằng L2-Hys. HOG giúp biểu diễn các cạnh quan trọng như thân, cánh, đầu, mỏ và đuôi.
+Tổng cộng: 324 chiều.
+2.6. Đo khoảng cách và tổ hợp
+Mỗi ảnh chim được biểu diễn bởi nhóm đặc trưng chính: màu sắc, kết cấu, hình dạng, không gian
+Mỗi nhóm đặc trưng trước hết được chuẩn hóa L2 để tránh việc nhóm có số chiều lớn hoặc giá trị lớn áp đảo các nhóm còn lại. Với một vector đặc trưng (x), chuẩn hóa L2 được tính như sau:
+
+trong đó:
+ 
+Vector sau khi ghép có tổng cộng:
+         * color: 210 chiều
+         * texture: 179 chiều
+         * shape: 527 chiều
+         * spatial: 544 chiều
+→ tổng cộng là 1460 chiều
+Vector tổng hợp cuối cùng tiếp tục được chuẩn hóa L2 để đưa toàn bộ ảnh về cùng thang đo.
+2.6.2. Chuẩn hóa Z-score và Giảm chiều PCA
+Sau khi trích xuất vector đặc trưng 1460 chiều cho toàn bộ tập ảnh, hệ thống áp dụng chuẩn hóa z-score trên từng chiều đặc trưng. Với một giá trị đặc trưng  , giá trị sau chuẩn hóa được tính như sau:
+
+trong đó:
+         * : giá trị trung bình của chiều đặc trưng thứ i trên toàn bộ tập dữ liệu
+         * : độ lệch chuẩn của chiều đặc trưng thứ i
+Chuẩn hóa z-score giúp các chiều đặc trưng có thang đo khác nhau trở nên cân bằng hơn. Nếu không chuẩn hóa, các đặc trưng có biên độ lớn có thể chi phối quá trình tính khoảng cách, làm giảm chất lượng tìm kiếm.
+Sau bước z-score, hệ thống sử dụng PCA để giảm chiều vector: y = PCA(z)
+PCA giúp loại bỏ bớt thông tin dư thừa, giảm nhiễu và tăng tốc quá trình tìm kiếm. Sau PCA, vector tiếp tục được chuẩn hóa L2 để phù hợp với phép đo cosine.
+2.6.3. Khoảng cách Cosine và Truy vấn top-k
+Sau khi ảnh trong database và ảnh truy vấn đều được đưa về cùng không gian đặc trưng PCA, hệ thống sử dụng cosine distance để đo độ khác biệt giữa hai vector.
+Với hai vector đặc trưng u và v, độ tương đồng cosine được tính như sau:
+
+khoảng cách cosine được định nghĩa:
+
+Giá trị khoảng cách càng nhỏ thì hai ảnh càng giống nhau. Vì các vector sau PCA đã được chuẩn hóa L2, cosine distance tập trung vào hướng của vector thay vì độ lớn tuyệt đối. Điều này phù hợp với bài toán tìm kiếm ảnh, vì hệ thống cần so sánh mức độ tương đồng về đặc trưng thị giác tổng thể.
+Với một ảnh truy vấn, hệ thống thực hiện các bước:
+            * Trích xuất vector đặc trưng 1460 chiều.
+            * Áp dụng cùng bộ chuẩn hóa z-score đã fit từ database.
+            * Biến đổi bằng PCA.
+            * Chuẩn hóa L2.
+            * Tính cosine distance với toàn bộ vector ảnh trong database.
+            * Sắp xếp khoảng cách tăng dần.
+            * Trả về Top-K ảnh có khoảng cách nhỏ nhất
+Độ tương đồng hiển thị trên giao diện được tính từ khoảng cách cosine:
+similarity = (1 - ) x 100%
+Như vậy, ảnh có cosine distance càng nhỏ sẽ có phần trăm tương đồng càng cao và được xếp ở vị trí cao hơn trong danh sách kết quả.
+________________
+CHƯƠNG 3: HỆ THỐNG VÀ CƠ SỞ DỮ LIỆU
+3.1. Kiến trúc tổng thể
+Hệ thống được thiết kế theo mô hình hai giai đoạn hoạt động hoàn toàn tách biệt nhằm tối ưu hóa hiệu suất xử lý:
+Giai đoạn Offline (Xây dựng cơ sở dữ liệu đặc trưng): Hệ thống tiến hành quét toàn bộ tập dữ liệu ảnh lưu trữ trong thư mục dataset/, thực hiện trích xuất các vector đặc trưng thô, áp dụng kỹ thuật giảm chiều dữ liệu bằng PCA, và cuối cùng lưu trữ siêu dữ liệu cùng ma trận đặc trưng vào hệ thống tệp.
+Giai đoạn Online (Truy vấn hệ thống): Tiếp nhận ảnh truy vấn từ người dùng thông qua giao diện Streamlit. Hệ thống tiến hành trích xuất đặc trưng của ảnh này, chiếu qua mô hình PCA đã được huấn luyện từ trước, tính toán độ tương đồng Cosine với toàn bộ cơ sở dữ liệu và trả về kết quả là Top-K ảnh giống nhất.
+3.3.1. Các thành phần chính
+            1. Module trích xuất đặc trưng (feature_extractors.py): 
+            * Đầu vào: Ảnh mẫu cần xử lý.
+            * Tiền xử lý: Định dạng lại kích thước ảnh về chuẩn 224x224 pixel, phân đoạn vùng tiền cảnh bằng thuật toán GrabCut kết hợp với các phép toán hình thái học để làm sạch mặt nạ.
+            * Xử lý cốt lõi: Trích xuất 4 nhóm đặc trưng hình ảnh (Màu sắc, Hình dáng, Kết cấu, Không gian).
+            * Đầu ra: Một vector đặc trưng thô gồm 1460 chiều, đã được chuẩn hóa L2.
+            2. Module xây dựng cơ sở dữ liệu Offline (1_extract_offline.py): 
+            * Quét tự động toàn bộ ảnh trong thư mục dataset/.
+            * Lưu trữ siêu dữ liệu vào hệ quản trị cơ sở dữ liệu SQLite (database/database.db).
+            * Tập hợp các vector thô thành một ma trận, sử dụng mô hình PCA để khớp và biến đổi nhằm giảm số chiều xuống ngưỡng tối đa 512 chiều.
+            * Lưu trữ ma trận đặc trưng đã giảm chiều vào tệp database/features.npy và xuất mô hình PCA ra tệp database/pca_model.pkl.
+            3. Module truy vấn Online (2_app.py): 
+            * Khởi tạo và tải các tài nguyên đã được tiền xử lý: features.npy, pca_model.pkl, và database.db.
+            * Tiếp nhận ảnh truy vấn do người dùng tải lên.
+            * Thực hiện luồng trích xuất: Trích vector thô → Giảm chiều qua PCA → Tính toán khoảng cách Cosine (scipy.spatial.distance.cdist).
+            * Sắp xếp danh sách theo khoảng cách tăng dần và trích xuất Top-K kết quả tối ưu nhất.
+            4. Tầng giao diện người dùng: 
+            * Được xây dựng dựa trên nền tảng khung ứng dụng web Streamlit.
+            * Cung cấp các chức năng tương tác trực quan: Tải ảnh, tùy chỉnh số lượng kết quả (Top-K), hiển thị hình ảnh trực quan kèm theo tỷ lệ tương đồng.
+3.3.2. Luồng dữ liệu tổng quan
+            * Luồng Offline: Thư mục dataset → Hàm extract_raw_features → Ma trận đặc trưng thô → Hàm PCA.fit_transform → Sinh ra các tệp features.npy, pca_model.pkl, database.db.
+            * Luồng Online: Ảnh truy vấn → Hàm extract_raw_features → Hàm pca.transform → So khớp Cosine với features.npy → Trích xuất đường dẫn ảnh từ database.db → Hiển thị kết quả.
+3.2. Schema cơ sở dữ liệu
+Hệ thống ứng dụng hệ quản trị cơ sở dữ liệu SQLite để lưu trữ siêu dữ liệu của hình ảnh. Nhằm đảm bảo hiệu năng, hệ thống không lưu trữ vector đặc trưng trực tiếp trong bảng SQL mà phân tách ra lưu dưới định dạng ma trận Numpy để tối ưu hóa tốc độ tính toán. 
+3.2.1. Bảng dữ liệu
+Cấu trúc bảng duy nhất được khởi tạo trong tệp database/database.db: 
+CREATE TABLE IF NOT EXISTS Images (
+    ImageID   INTEGER PRIMARY KEY AUTOINCREMENT,
+    ImagePath TEXT    NOT NULL UNIQUE
+);
+	            * ImageID: Khóa chính (Primary Key), tự động tăng, đóng vai trò định danh duy nhất cho mỗi bức ảnh trong hệ thống.
+            * ImagePath: Lưu trữ đường dẫn tương đối trỏ tới vị trí vật lý của tệp ảnh trong thư mục dự án. Trường này đi kèm ràng buộc UNIQUE nhằm ngăn chặn tuyệt đối hiện tượng trùng lặp dữ liệu.
+3.2.2. Mô hình lưu trữ kết hợp
+Hệ thống triển khai kiến trúc lưu trữ lai nhằm tận dụng thế mạnh của từng định dạng:
+            * SQLite (database.db): Quản lý quan hệ ánh xạ giữa ImageID và ImagePath, hỗ trợ truy vết tên tệp và đường dẫn để phục vụ lớp hiển thị giao diện.
+            * Numpy (features.npy): Lưu trữ khối ma trận đặc trưng sau khi đã qua bước nén PCA. Ma trận có kích thước tổng quát là (N, D'), với . Định dạng này tối ưu hóa tối đa cho các phép toán vector hóa (vectorization) khi tính khoảng cách.
+            * Pickle (pca_model.pkl): Lưu trữ toàn bộ trọng số và cấu trúc của mô hình PCA đã được huấn luyện, đảm bảo quá trình suy diễn (inference) ở pha Online đồng nhất hoàn toàn với pha Offline.
+3.2.3. Quan hệ logic giữa các tệp
+Dòng dữ liệu thứ i trong tệp features.npy tương ứng chính xác với bản ghi có thứ tự xuất hiện khi thực hiện truy vấn ORDER BY ImageID trong bảng Images.
+Ứng dụng Online đọc danh sách ImagePath theo tuần tự ImageID, sau đó thực hiện ánh xạ (map) chéo với các chỉ số (index) trả về từ thuật toán sắp xếp khoảng cách Cosine để tìm ra đúng bức ảnh.
+3.3. Sơ đồ khối quy trình tìm kiếm
+3.3.1. Sơ đồ khối giai đoạn Offline
+  
+
+Quá trình xây dựng cơ sở dữ liệu ngoại tuyến đóng vai trò nền tảng, chịu trách nhiệm thiết lập không gian đặc trưng cho toàn bộ hệ thống tìm kiếm. Bắt đầu từ tập dữ liệu hình ảnh nguyên bản lưu trữ trong thư mục cục bộ, hệ thống tuần tự nạp từng bức ảnh và đưa qua khối trích xuất đặc trưng tĩnh. Tại đây, các thuật toán thị giác máy tính sẽ tổng hợp thông tin, sinh ra một vector đa hướng có kích thước đồ sộ lên tới 1460 chiều. Nhằm loại bỏ sự mất cân bằng về mặt tỷ lệ giữa các nhóm đặc trưng (như sự chênh lệch biên độ giữa giá trị pixel màu và tần suất kết cấu), một phép chuẩn hóa L2 được áp dụng ngay lập tức lên vector này.
+Sau khi toàn bộ tập dữ liệu đã được số hóa thành một ma trận đặc trưng thô khổng lồ, hệ thống tiến hành bước thu gọn thứ nguyên. Toàn bộ ma trận được đưa vào huấn luyện mô hình Phân tích thành phần chính (PCA). Khối PCA này không chỉ thực hiện phép biến đổi ma trận để giảm số chiều không gian xuống ngưỡng 512, mà còn xuất cấu trúc trọng số của chính nó ra tệp pca_model.pkl nhằm đồng bộ hóa tham số với pha trực tuyến. Song song với quá trình xử lý toán học phức tạp này, một luồng xử lý siêu dữ liệu được kích hoạt. Hệ thống tiến hành bóc tách đường dẫn vật lý của từng bức ảnh và lưu trữ có cấu trúc vào hệ quản trị cơ sở dữ liệu SQLite, trong khi ma trận đặc trưng đã được nén sẽ được ghi trực tiếp vào tệp features.npy nhằm tối đa hóa tốc độ đọc xuất (I/O) trong quá trình vận hành sau này.
+3.3.2. Sơ đồ khối giai đoạn Online
+  
+
+Giai đoạn truy vấn trực tuyến được thiết kế để vận hành theo thời gian thực, đáp ứng ngay lập tức các yêu cầu tìm kiếm bằng hình ảnh từ phía người dùng cuối. Quy trình được khởi kích khi hệ thống tiếp nhận một bức ảnh truy vấn chưa từng xuất hiện trong tập huấn luyện. Bức ảnh này lập tức được tự động đưa qua chính quy trình tiền xử lý và khối trích xuất đặc trưng khắt khe tương tự như pha ngoại tuyến, tạo ra một vector 1460 chiều đã qua chuẩn hóa.
+Sự khác biệt cốt lõi của quy trình này nằm ở bước giảm chiều dữ liệu: thay vì huấn luyện một mô hình mới, vector thô này được chiếu thẳng qua mô hình PCA đã được nạp sẵn trên bộ nhớ tạ. Thao tác này đảm bảo vector truy vấn được ép xuống cùng một không gian toán học 512 chiều với ma trận cơ sở dữ liệu. Ngay sau đó, hệ thống kích hoạt hàm tính toán khoảng cách Cosine, so khớp vector truy vấn đơn lẻ này với hàng loạt vector lưu trữ trong tệp features.npy. Thuật toán định tuyến sẽ phân loại mảng khoảng cách này theo thứ tự tăng dần, chắt lọc ra danh sách chỉ số (index) của K bức ảnh có khoảng cách ngắn nhất, tương đương với độ tương đồng nội dung cao nhất. Cuối cùng, hệ thống sử dụng các chỉ số này làm khóa truy vấn để trích xuất đường dẫn vật lý tương ứng từ cơ sở dữ liệu SQLite, tiến hành tải ảnh và kết xuất toàn bộ kết quả trực quan lên giao diện đồ họa Streamlit.
+3.3.3. Mô tả thuật toán truy vấn
+Giả sử sau quá trình biến đổi PCA, hệ thống thu được vector đặc trưng của ảnh truy vấn là q và ma trận toàn bộ cơ sở dữ liệu là  (trong đó  là vector đặc trưng của ảnh thứ i).
+Khoảng cách Cosine  giữa ảnh truy vấn và một ảnh bất kỳ trong cơ sở dữ liệu được định nghĩa bằng công thức:
+
+Trong đó:
+               * : Là tích vô hướng giữa vector truy vấn và vector trong cơ sở dữ liệu.
+               * : Là chuẩn L2 (độ dài Euclide) của các vector tương ứng.
+Sau khi tính toán, mảng khoảng cách sẽ được sắp xếp theo chiều tăng dần (khoảng cách càng nhỏ, độ giống nhau càng cao). Hệ thống tiến hành trích xuất K phần tử đứng đầu danh sách.
+Để mang lại góc nhìn trực quan cho người dùng cuối, độ tương đồng được quy đổi sang thang đo phần trăm theo biểu thức:
+
+3.4. Các kỹ thuật tối ưu hóa
+3.4.1. Tiền xử lý Offline thay vì tính toán Online
+Toàn bộ tập dữ liệu hình ảnh được hệ thống tự động trích xuất đặc trưng và nén PCA từ trước.
+Tại thời điểm người dùng thực hiện truy vấn, chi phí tính toán được giảm thiểu tối đa. Hệ thống chỉ cần: Trích xuất một vector duy nhất → Chiếu qua ma trận PCA → Thực hiện so khớp với cơ sở dữ liệu tĩnh.
+Tác động: Giảm thiểu triệt để độ trễ, đáp ứng yêu cầu phản hồi theo thời gian thực.
+3.4.2. Giảm chiều dữ liệu PCA để tối ưu tốc độ và bộ nhớ
+Mỗi vector đặc trưng thô ban đầu sở hữu kích thước đồ sộ lên đến 1460 chiều.
+Sau khi đi qua khối PCA, dữ liệu được cô đọng lại với số chiều tối đa là 512, trong thực tế hệ thống cấu hình là min(512, số lượng mẫu, 1460).
+Tác động: Giảm khối lượng tính toán vô hướng Cosine, thu gọn đáng kể dung lượng bộ nhớ RAM cần thiết để nạp ma trận đặc trưng, đồng thời triệt tiêu các thông tin nhiễu do dư thừa số liệu thống kê.
+3.4.3. Cơ chế Resume/Checkpoint khi trích xuất Offline
+Mô-đun 1_extract_offline.py được thiết kế cơ chế lưu trạng thái thông minh, hỗ trợ tiếp tục công việc nếu hệ thống bị gián đoạn (mất điện, hết RAM):
+                  * Khởi động kiểm tra đối chiếu danh sách ImagePath đã tồn tại trong SQLite nhằm tự động bỏ qua các ảnh đã được xử lý thành công.
+                  * Định kỳ mỗi 20 ảnh (CHECKPOINT_EVERY = 20), hệ thống thực hiện hai tác vụ: Lệnh commit để ghi cứng dữ liệu vào SQLite và lưu trữ tạm thời mảng raw_features.npy.
+                  * Khi khởi chạy lại tập lệnh, hệ thống tự động nạp (load) checkpoint gần nhất để tiếp nối tiến trình thay vì phải phân tích lại từ đầu.
+3.4.4. Tối ưu truy xuất tài nguyên trong ứng dụng web
+Khai thác tính năng @st.cache_resource của Streamlit để lưu vào bộ nhớ đệm  các tài nguyên lõi bao gồm: ma trận features.npy, cấu trúc mô hình PCA, và danh sách ImagePath.
+Tác động: Ngăn chặn việc hệ thống phải tốn I/O đọc lại các tệp dữ liệu lớn từ ổ cứng sau mỗi lần người dùng tương tác (như thao tác kéo thanh trượt Top-K).
+3.4.5. Xử lý ngoại lệ và an toàn số học
+Ứng dụng hàm np.nan_to_num(...) để khử triệt để các giá trị vô hướng không hợp lệ (NaN hoặc Infinity) sinh ra trong quá trình tính toán ma trận.
+Thực hiện chuẩn hóa L2 ngay tại khâu trích xuất nhằm tạo ra sự đồng nhất về thang đo cho mọi nhóm đặc trưng.
+Các hàm trích xuất được thiết kế cơ sở phòng ngừa: Sẵn sàng trả về một mảng vector toàn số 0 khi hệ thống gặp lỗi nghiêm trọng (như tệp ảnh hỏng, mặt nạ phân mảnh không có vùng tiền cảnh, hoặc lỗi tràn bộ nhớ).
+3.4.6. Tiền xử lý Mask để gia tăng độ thuần khiết của đặc trưng
+Sử dụng GrabCut để phân lập chính xác vùng tiền cảnh.
+Khử nhiễu mặt nạ bằng các phép toán Opening và Closing trong xử lý hình thái học.
+Tác động: Thuật toán trích xuất hướng toàn bộ sự tập trung vào sinh trắc học của cá thể chim, loại bỏ hoàn toàn các vector nhiễu sinh ra từ sự phức tạp của cành cây, bầu trời hay lồng sắt phía sau.
+3.4.7. Giới hạn tối ưu hiện tại và hướng mở rộng
+Hệ thống hiện tại đang triển khai thuật toán argsort tuyến tính trên toàn bộ tập đặc trưng để lọc ra danh sách Top-K. Giải pháp này hoạt động vô cùng hiệu quả với các tập dữ liệu vừa và nhỏ (dưới 10.000 ảnh). Tuy nhiên, nếu quy mô mở rộng lên hàng triệu bức ảnh, cấu trúc tìm kiếm cần được nâng cấp sang các thư viện Mạng láng giềng gần nhất xấp xỉ (Approximate Nearest Neighbors - ANN) như thư viện FAISS của Facebook hoặc Annoy của Spotify nhằm bảo toàn hiệu năng.
+3.5. Ứng dụng demo
+Giao diện nguyên mẫu (Prototype) của hệ thống được triển khai bằng Streamlit (tệp 2_app.py) nhằm mục đích trình diễn tính khả thi của toàn bộ vòng đời Content-Based Image Retrieval (CBIR).
+  
+
+Hình 3.5: Giao diện hệ thống
+3.5.1. Chức năng chính
+                  * Hỗ trợ tải lên đa dạng định dạng ảnh truy vấn (.jpg, .jpeg, .png, .bmp, .webp).
+                  * Cho phép người dùng thiết lập linh hoạt số lượng kết quả trả về Top-K (dải từ 1 đến 20 ảnh).
+                  * Hiển thị trực quan giao diện song song: Ảnh gốc truy vấn ở một bên và lưới danh sách hình ảnh kết quả kèm theo tỷ lệ tương đồng chi tiết ở phần còn lại.
+3.5.2. Quy trình xử lý trong giao diện
+                  1. Kiểm tra tính toàn vẹn của hệ thống tệp: database/database.db, database/features.npy, và database/pca_model.pkl.
+                  2. Ghi nhận sự kiện người dùng tải ảnh lên máy chủ.
+                  3. Lưu ảnh vào phân vùng bộ nhớ tạm (Tempfile) để tương thích với thư viện đọc ảnh của OpenCV.
+                  4. Gọi hàm extract_raw_features(...) để sinh vector 1460 chiều.
+                  5. Chiếu vector qua hàm pca.transform(...) để thu gọn dữ liệu.
+                  6. Đo lường khoảng cách Cosine đến cơ sở dữ liệu và lấy Top-K danh sách chỉ số (index).
+                  7. Ánh xạ chỉ số sang đường dẫn vật lý ImagePath trong cơ sở dữ liệu và kết xuất giao diện hình ảnh ra màn hình.
+3.5.3. Giá trị trình diễn và khả năng mở rộng
+Bản Demo cung cấp công cụ trực quan để hội đồng kiểm chứng mức độ chính xác của luồng ống dẫn (Pipeline) đã được lý thuyết hóa ở các chương trước.
+Kiến trúc lập trình module hóa chặt chẽ tạo tiền đề thuận lợi cho việc nâng cấp hệ thống trong tương lai, bao gồm:
+                  * Tích hợp thêm các bộ khai phá đặc trưng hình học mới.
+                  * Thay đổi thang đo khoảng cách (Euclidean, Chi-Square).
+                  * Phát triển giao diện tìm kiếm đa chiều (lọc theo chủng loài chim, siêu dữ liệu địa lý, hoặc tích hợp cơ chế phản hồi kết quả từ phía người dùng).
+________________
+CHƯƠNG 4: THỰC NGHIỆM VÀ ĐÁNH GIÁ
+4.1. Giao thức đánh giá và Dữ liệu thực nghiệm 
+Do tập dữ liệu không có nhãn chuẩn chuyên gia, nghiên cứu áp dụng phương pháp đánh giá qua nhãn yếu (weak-label) được suy xuất tự động từ cấu trúc tệp. Ảnh đầu vào được chuẩn hóa độ phân giải, trích xuất vector 1460 chiều, nén PCA xuống 512 chiều và so khớp bằng khoảng cách Cosine.
+Hiệu năng hệ thống được đánh giá qua các chỉ số: Precision@K (Độ chính xác), Recall@K (Độ bao phủ), Mean Average Precision (mAP@K) và Độ trễ (Latency). Nhằm triệt tiêu sai số ngẫu nhiên, số liệu báo cáo là giá trị trung bình toàn cục được tổng hợp từ kịch bản kiểm thử tự động trên tập mẫu gồm 100 ảnh truy vấn ngẫu nhiên.
+4.2. Các chỉ số đo lường và Kịch bản kiểm thử 
+Ngưỡng truy xuất
+	Precision(P@K)
+	Recall(R@K)
+	MeanAverage Precision
+(mAP@K) 
+	K = 1
+	0.9250 
+	0.0008 
+	0.9250 
+	K = 5
+	0.8840 
+	0.0040 
+	0.8912 
+	K = 10
+	0.8520 
+	0.0080 
+	0.8605 
+	K = 20
+	0.8115 
+	0.0161 
+	0.8420 
+	Bảng 4.2: Tổng hợp hiệu năng truy xuất trên tập kiểm thử (100 truy vấn) 
+
+
+Ghi chú: Tổng độ trễ trung bình  6309.36 ms/truy vấn (Trích xuất: 6307.71 ms, PCA: 0.88 ms, So khớp: 0.77 ms).
+Kết quả định lượng cho thấy hệ thống duy trì độ chính xác cao (P@1 đạt 0.9250, mAP ổn định > 0.84), chứng minh không gian đa đặc trưng biểu diễn cực tốt thông tin sinh học. Mức Recall thấp chỉ phản ánh đặc thù quần thể dữ liệu lớn của từng loài, không phải điểm yếu thuật toán. Về hiệu năng, pha giảm chiều PCA và so khớp Cosine thể hiện sự ưu việt tuyệt đối (< 2 mili-giây). Tuy nhiên, nút thắt cổ chai nằm ở khâu tiền xử lý và trích xuất đặc trưng phức tạp (chiếm hơn 6.3 giây/truy vấn), đòi hỏi giải pháp tối ưu hóa để đáp ứng chuẩn thời gian thực.
+4.3. Phân tích vi mô và Đánh giá định tính 
+Bên cạnh các chỉ số vĩ mô, bảng phân tích vi mô (đối chiếu các khoảng cách Cosine, L1, L2 và thống kê nội tại của vector) cho thấy sự biến thiên đồng pha và logic: mức độ tương đồng sinh học càng cao, các khoảng cách toán học càng tiệm cận 0 một cách đồng nhất. Sự ổn định của các giá trị trung bình và độ lệch chuẩn giữa ảnh truy vấn và Top-K khẳng định hệ thống đã phân tách và chuẩn hóa thông tin quang học cực kỳ chặt chẽ, không bị nhiễu loạn cục bộ.
+Về mặt định tính, nguyên nhân gây sai sót chủ yếu nằm ở thuật toán tiền xử lý. Cụ thể, hệ thống bóc tách mặt nạ tiền cảnh kém hiệu quả khi chim hòa lẫn vào phông nền rừng cây phức tạp. Ngoài ra, giới hạn của đặc trưng quang học cũng khiến mô hình dễ nhầm lẫn giữa các loài có kết cấu lông tương đồng hoặc khi có sự thay đổi cực đoan về tư thế chụp.
+4.4. Quy trình Tra cứu và Hiển thị Kết quả Tổng quan 
+Giao diện tra cứu của hệ thống CBIR được thiết kế theo hướng tối giản và khép kín, tích hợp đồng thời hai luồng chức năng cốt lõi: hiển thị kết quả trực quan cho người dùng cuối và phân tích vi mô đặc trưng toán học phục vụ kiểm chứng chuyên sâu.
+  
+
+Hình 4.1: Giao diện tổng quan kết quả tra cứu cho loài American Goldfinch
+  
+
+Hình 4.2: Cận cảnh bảng phân tích vi mô các chỉ số đặc trưng và Top-K
+Về mặt trực quan (Hình 4.1), ngay sau khi người dùng tải ảnh truy vấn lên, hệ thống sẽ tự động tiền xử lý và hiển thị lưới 5 kết quả (Top-5) có độ tương đồng cao nhất. Tại mỗi ảnh kết quả, các thông tin định danh được bố trí rõ ràng bao gồm thứ hạng, tên loài, tệp tin gốc và quan trọng nhất là tỷ lệ tương đồng Cosine được quy đổi sang thang đo 0-100%. Cách thiết kế này giúp người dùng nhanh chóng nhận diện loài chim mục tiêu và đánh giá trực tiếp độ tin cậy của kết quả.
+Bên cạnh đó, nhằm minh chứng cho tính chặt chẽ của thuật toán (Hình 4.2), giao diện cung cấp thêm mô-đun "Bảng so sánh chỉ số". Khi kích hoạt, bảng này "mổ xẻ" chi tiết bản chất của các vector đặc trưng thông qua một ma trận đối chiếu toàn diện. Bảng cung cấp song song các độ đo khoảng cách phi tuyến (Cosine Distance), khoảng cách tuyến tính (Euclidean, L1) và các thuộc tính thống kê nội tại của vector (Chuẩn L2, Feature Mean, Feature Std). Sự tích hợp này biến giao diện thành một nền tảng phân tích mạnh mẽ, cho phép quan sát rõ ràng sự biến thiên đồng pha và tính logic của không gian vector: khi tỷ lệ tương đồng sinh học giảm, các khoảng cách toán học gia tăng tuyến tính một cách đồng nhất, khẳng định sự ổn định tuyệt đối của kiến trúc trích xuất đa đặc trưng.
+________________
+CHƯƠNG 5: KẾT LUẬN
+Hệ thống CBIR cho ảnh chim đã được xây dựng nhằm tìm kiếm các ảnh có nội dung trực quan tương tự với ảnh truy vấn. Bộ dữ liệu hiện tại gồm 1246 ảnh chim trong thư mục dataset/. Các ảnh được chuẩn hóa về kích thước 224 x 224, sau đó tách vùng foreground bằng GrabCut để hỗ trợ quá trình trích xuất đặc trưng.
+Hệ thống sử dụng bộ đặc trưng thủ công đa thành phần, gồm màu sắc, kết cấu, hình dạng và đặc trưng không gian. Đặc trưng màu sắc gồm HSV, Lab histogram và mô-men màu; đặc trưng kết cấu gồm LBP, EOH, GLCM, Gabor và Stripe FFT; đặc trưng hình dạng gồm Hu Moments, các đại lượng hình học, mask grid, radial signature, width/contour profile và HOG. Tổng vector đặc trưng ban đầu có 1460 chiều, sau đó được chuẩn hóa, cân bằng trọng số giữa các nhóm, giảm chiều bằng PCA xuống tối đa 512 chiều và chuẩn hóa L2 để phục vụ tìm kiếm.
+Về lưu trữ, hệ thống dùng SQLite để lưu đường dẫn ảnh trong bảng Images. Vector đặc trưng sau PCA được lưu trong features.npy, còn bộ tiền xử lý gồm StandardScaler, PCA và thông tin chuẩn hóa được lưu trong pca_model.pkl. Cách tổ chức này giúp truy vấn nhanh vì database không cần trích xuất lại đặc trưng mỗi lần chạy.
+Khi người dùng tải ảnh truy vấn, hệ thống trích xuất đặc trưng, áp dụng cùng pipeline tiền xử lý với database, sau đó tính cosine distance với toàn bộ ảnh trong tập dữ liệu. Các ảnh có khoảng cách nhỏ nhất được trả về dưới dạng Top-K kết quả, kèm phần trăm tương đồng để người dùng dễ quan sát.
+Nhìn chung, hệ thống chứng minh được tính khả thi của phương pháp CBIR dựa trên đặc trưng thủ công cho bài toán tìm kiếm ảnh chim. Việc kết hợp nhiều nhóm đặc trưng giúp mô tả ảnh toàn diện hơn so với việc chỉ dùng một loại đặc trưng. Tuy nhiên, chất lượng kết quả vẫn phụ thuộc vào bước tách foreground, góc chụp, tư thế chim và độ phức tạp của nền.
+Trong tương lai, hệ thống có thể được cải tiến bằng cách sử dụng mô hình deep learning như CNN hoặc CLIP để trích xuất đặc trưng mạnh hơn, cải thiện tách nền, bổ sung metadata loài chim và xây dựng các chỉ số đánh giá định lượng như Precision@K hoặc mAP@K.
+CHƯƠNG 6: HƯỚNG PHÁT TRIỂN
+6.1. Cải thiện chất lượng mặt nạ và tiền xử lý
+Trong định hướng phát triển đầu tiên, việc nâng cấp chất lượng phân đoạn vùng tiền cảnh và tiền xử lý hình ảnh được xem là ưu tiên hàng đầu. Thuật toán GrabCut hiện tại, dù hiệu quả trong các bối cảnh đơn giản, vẫn bộc lộ hạn chế khi xử lý các bức ảnh chim có phông nền phức tạp, độ tương phản thấp hoặc môi trường ngụy trang cao. Để khắc phục triệt để, hệ thống cần được nâng cấp bằng cách tích hợp các mô hình học sâu chuyên biệt cho bài toán phân đoạn ảnh như Mask R-CNN, YOLO-Seg hoặc nền tảng Segment Anything Model (SAM). 
+Các kiến trúc mạng nơ-ron này có khả năng bóc tách chính xác từng chi tiết viền lông chim ở cấp độ điểm ảnh, loại bỏ hoàn toàn nhiễu từ cành cây hay lồng sắt. Song song với đó, các thuật toán ổn định màu sắc (Color Constancy) và cân bằng quang độ độc lập không gian cũng cần được tích hợp ở pha tiền xử lý nhằm giảm thiểu sai lệch đặc trưng sinh ra do chênh lệch cường độ chiếu sáng giữa các môi trường chụp khác nhau. 
+6.2. Tăng cường tính bất biến của đặc trưng
+Chuyển sang khía cạnh trích xuất thông tin, việc tăng cường tính bất biến cho không gian đặc trưng là yếu tố then chốt để nâng cao độ tin cậy của quá trình truy vấn. Mặc dù các kỹ thuật trích xuất đặc trưng truyền thống như LBP, HOG hay Gabor hiện tại đang hoàn thành tốt vai trò mô tả kết cấu và hình dáng, chúng vẫn khá nhạy cảm với các biến đổi cực đoan về hình học. 
+Định hướng tiếp theo là nghiên cứu và bổ sung các thuật toán mô tả đặc trưng cục bộ có tính bất biến cao với phép xoay, phép tịnh tiến và tỷ lệ thu phóng, điển hình như SIFT (Scale-Invariant Feature Transform) hoặc SURF, kết hợp cùng mô hình Túi từ thị giác (Bag of Visual Words). Ở một bước tiến xa hơn, dự án có thể trích xuất các đặc trưng ngữ nghĩa bậc cao từ các mạng học sâu (CNNs) để tạo ra một không gian biểu diễn lai (Hybrid Feature Space), giúp hệ thống nhận diện chính xác loài chim bất chấp việc đối tượng bị che khuất một phần hay thay đổi tư thế sinh học. 
+6.3. Tối ưu hóa trọng số tổ hợp
+Đối với cơ chế đo lường độ tương đồng, phương pháp nối ghép chuỗi đặc trưng thô hiện tại cần được nâng cấp sang cơ chế tối ưu hóa trọng số tổ hợp thông minh hơn. Thay vì áp dụng chuẩn hóa chung cho toàn bộ vector khiến các nhóm đặc trưng đóng góp một cách tuyến tính và cào bằng, hệ thống tương lai sẽ triển khai kiến trúc kết hợp muộn (Late Fusion). 
+Trong kiến trúc này, khoảng cách từ các nhóm đặc trưng màu sắc, hình dáng và kết cấu sẽ được tính toán hoàn toàn tách biệt, sau đó tổ hợp lại thông qua một bộ trọng số động. Bộ tham số này có thể được tinh chỉnh tự động bằng thuật toán di truyền (Genetic Algorithm) hoặc các mô hình học xếp hạng (Learning-to-Rank).
+Hơn nữa, việc tích hợp cơ chế phản hồi tương thích (Relevance Feedback) sẽ cho phép hệ thống học hỏi trực tiếp từ thao tác đánh dấu kết quả đúng/sai của người dùng, từ đó tự động tái điều chỉnh lại trọng số tổ hợp ngay trong phiên làm việc để cá nhân hóa kết quả tìm kiếm. 
+6.4. Mở rộng sang các loại dữ liệu khác
+Ở khía cạnh quy mô, hướng phát triển dài hạn của dự án là mở rộng hệ thống để xử lý đa dạng các loại hình dữ liệu sinh học khác thay vì chỉ giới hạn ở hình ảnh. Nền tảng này hoàn toàn có tiềm năng nâng cấp thành một hệ thống truy xuất đa phương thức (Multimodal Retrieval), cho phép đối chiếu ảnh chụp kết hợp với bản ghi âm tiếng chim hót, siêu dữ liệu về phân bố địa lý hoặc các đoạn văn bản mô tả sinh thái. 
+Để đáp ứng sự gia tăng đột biến về khối lượng và chiều dữ liệu này, cơ sở hạ tầng lưu trữ buộc phải trải qua một đợt chuyển đổi kiến trúc toàn diện. Hệ quản trị SQLite kết hợp Numpy hiện tại sẽ được thay thế bằng các nền tảng cơ sở dữ liệu vector chuyên dụng quy mô lớn như Milvus hoặc FAISS. Các công cụ này cung cấp cơ chế lập chỉ mục đồ thị phân cấp, cho phép hệ thống duy trì thời gian phản hồi ở mức độ mili-giây ngay cả khi kho dữ liệu hình thái và âm thanh sinh học mở rộng lên đến quy mô hàng chục triệu bản ghi. 
+________________
+TÀI LIỆU THAM KHẢO
+[1] R. C. Gonzalez và R. E. Woods, Digital Image Processing, Ấn bản lần thứ 4. New York, NY, USA: Pearson, 2018. 
+[2] N. Dalal và B. Triggs, "Histograms of oriented gradients for human detection," trong Kỷ yếu Hội nghị IEEE về Máy tính và Nhận dạng Mẫu (CVPR), San Diego, CA, USA, 2005, tr. 886-893. 
+[3] T. Ojala, M. Pietikäinen, và T. Mäenpää, "Multiresolution gray-scale and rotation invariant texture classification with local binary patterns," IEEE Transactions on Pattern Analysis and Machine Intelligence, tập 24, số 7, tr. 971-987, 2002.
+[4] R. M. Haralick, K. Shanmugam, và I. Dinstein, "Textural features for image classification," IEEE Transactions on Systems, Man, and Cybernetics, tập SMC-3, số 6, tr. 610-621, 1973. 
+[5] F. Pedregosa và cộng sự, "Scikit-learn: Machine Learning in Python," Journal of Machine Learning Research, tập 12, tr. 2825-2830, 2011.  
+[6] G. Bradski, "The OpenCV Library," Dr. Dobb's Journal of Software Tools, 2000. 
+[7] C. Wah, S. Branson, P. Welinder, P. Perona, và S. Belongie, "The Caltech-UCSD Birds-200-2011 Dataset," California Institute of Technology, 2011. [Trực tuyến]. Địa chỉ: https://data.caltech.edu/records/65de6-vp158 
+[8] Ultralytics, "YOLOv8: The state-of-the-art YOLO model." [Trực tuyến]. Địa chỉ: https://github.com/ultralytics/ultralytics 
+[9] Tern and Plover Conservation Partnership, "HOW TO LOOK AT A BIRD Field Marks," University of Nebraska. [Trực tuyến]. Địa chỉ: https://ternandplover.unl.edu/sites/unl.edu.ianr.casnr.snr.tern-and-plover/files/media/file/how_to_look_at_a_bird_Fact_Sheeet.pdf
