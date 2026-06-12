@@ -82,7 +82,12 @@ def infer_label(image_path: str, mode: str, regex: Optional[str] = None) -> str:
     stem = os.path.splitext(os.path.basename(norm))[0]
 
     if mode == "parent":
-        return parent if parent else stem
+        if parent.lower() == "dataset" or not parent:
+            parts = stem.split("_")
+            if len(parts) > 2:
+                return "_".join(parts[:-2]).lower()
+            return stem.lower()
+        return parent.lower()
     if mode == "stem_prefix":
         parts = re.split(r"[_\-\s]+", stem)
         return parts[0].lower() if parts and parts[0] else stem.lower()
