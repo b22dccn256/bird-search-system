@@ -552,7 +552,7 @@ def extract_raw_features(image_path: str) -> Optional[np.ndarray]:
     """Hàm chính: đọc ảnh -> masking -> trích tất cả đặc trưng ->
     concatenate -> L2-normalize.
 
-    Pipeline:
+    Pipeline:8
       1. Đọc ảnh, resize 224x224
       2. GrabCut foreground mask
       3. Color   (210 dim)

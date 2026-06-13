@@ -9,25 +9,39 @@ Hệ thống **CBIR (Content-Based Image Retrieval)** tìm kiếm ảnh chim tư
 ```
 bird-search-system/
 │
-├── dataset/                     # Ảnh chim đã tiền xử lý (224×224)
+├── dataset/                     # Ảnh chim đã tiền xử lý chuẩn (1239 ảnh, kích thước 224×224)
 ├── database/
-│   ├── database.db              # SQLite — siêu dữ liệu ảnh
-│   ├── features.npy             # Ma trận vector đặc trưng sau PCA (N × 512)
+│   ├── database.db              # SQLite — quản lý ImageID và ImagePath tương đối
+│   ├── features.npy             # Ma trận vector đặc trưng sau PCA (1239 × 512)
+│   ├── features.csv             # Bảng đặc trưng CSV trực quan kết hợp file path (từ script chuyển đổi)
 │   ├── pca_model.pkl            # Mô hình PCA đã huấn luyện
-│   └── faiss.index              # Chỉ mục FAISS (cosine similarity)
+│   └── faiss.index              # Chỉ mục FAISS (IndexFlatIP) dùng để so khớp Cosine nhanh
 │
 ├── data/
-│   └── result_grabcut/          # Ảnh trung gian kiểm tra GrabCut (debug)
+│   ├── process_loc_tay/         # Ảnh gốc chưa lọc
+│   ├── process_loc_tay_2/       # Thư mục ảnh gốc bổ sung dùng để chạy lọc YOLOv8
+│   ├── process_224_(dts)/       # Thư mục ảnh chim 224x224 đạt chuẩn đầu ra
+│   └── result_grabcut/          # Ảnh trung gian kiểm tra mặt nạ GrabCut (phục vụ debug)
 │
-├── results/                     # Kết quả đánh giá định lượng
+├── results/                     # Kết quả đánh giá chất lượng truy hồi
+│   ├── per_query_metrics.csv    # Chi tiết độ chính xác của từng ảnh truy vấn
+│   ├── quantitative_summary.csv # Kết quả đánh giá tổng hợp dạng CSV
+│   └── quantitative_summary.md  # Báo cáo đánh giá tổng hợp dạng Markdown
 │
-├── feature_extractors.py        # Module trích xuất đặc trưng (1460 chiều)
-├── 0_yolo_shift_crop.py         # Tiền xử lý: phát hiện & cắt chim bằng YOLOv8
-├── 1_extract_offline.py         # Xây dựng CSDL offline (extract + PCA + FAISS)
-├── 2_app.py                     # Ứng dụng Streamlit tìm kiếm
-├── debug_grabcut_preview.py     # Xem trước kết quả phân đoạn GrabCut
-├── evaluate_weak_labels.py      # Đánh giá chất lượng truy hồi
-└── requirements.txt
+├── file_support/                # Thư mục chứa các script tiện ích & tài liệu nhóm
+│   ├── 0_yolo_shift_crop.py     # Script YOLOv8 crop phiên bản đầu
+│   ├── build_faiss_only.py      # Build riêng faiss.index từ file features.npy có sẵn
+│   ├── convert_features_to_csv.py # Chuyển đổi ma trận đặc trưng features.npy sang dạng CSV trực quan
+│   ├── baocao_nhom11_hecsdldpt.txt # Báo cáo kết quả của Nhóm 11
+│   └── dataset_old/             # Tập dữ liệu cũ lưu trữ dự phòng
+│
+├── 0_2_yolo_filter_images.py    # Script lọc ảnh gốc theo tỷ lệ aspect-ratio và cắt căn giữa YOLOv8
+├── 1_extract_offline.py         # Trích xuất đặc trưng offline (GrabCut -> Trích đặc trưng -> PCA -> FAISS)
+├── 2_app.py                     # Web App Streamlit tìm kiếm ảnh chim tương đồng trực quan
+├── debug_grabcut_preview.py     # Script xem trước mặt nạ GrabCut phân đoạn chim/nền
+├── evaluate_weak_labels.py      # Script đánh giá chất lượng hệ thống (Weak-label evaluation)
+├── requirements.txt             # Danh sách thư viện Python cần thiết
+└── yolov8n.pt                   # Trọng số YOLOv8 Nano dùng nhận diện chim
 ```
 
 ---
@@ -38,7 +52,7 @@ bird-search-system/
 
 | Tiêu chí | Yêu cầu đề bài | Thực tế triển khai |
 |---|---|---|
-| Số lượng ảnh | ≥ 500 | **1 246 ảnh** |
+| Số lượng ảnh | ≥ 500 | **1 239 ảnh** |
 | Số loài chim khác nhau | Nhiều loài | **122 loài** |
 | Kích thước đồng nhất | Cùng kích thước | **224 × 224 pixel** |
 | Định dạng | Tùy chọn | **JPEG (.jpg)** |
@@ -48,27 +62,30 @@ bird-search-system/
 
 Dữ liệu được thu thập từ bộ ảnh chim theo chuẩn đặt tên CUB-200 (ví dụ: `Acadian_Flycatcher_0012_795612.jpg`), bao gồm nhiều loài chim Bắc Mỹ với ảnh chụp chim đang đậu, góc ngang.
 
-### 1.2. Quy trình tiền xử lý dữ liệu
+### 1.2. Quy trình tiền xử lý dữ liệu và lọc tránh biến dạng hình ảnh
 
-Pipeline tiền xử lý gồm hai giai đoạn:
+Quy trình tiền xử lý dữ liệu được thiết kế nhằm bảo toàn tỷ lệ cơ thể chim (aspect ratio), tránh biến dạng méo hình khi đưa vào trích xuất đặc trưng.
 
-**Giai đoạn 1 — Lọc thủ công (`data/process_loc_tay/`)**
-
+**Giai đoạn 1 — Lọc thủ công ban đầu (`data/process_loc_tay/`)**
 - Chọn ảnh thỏa điều kiện: chim **đang đậu**, **không bay**, góc chụp **ngang**.
 - Loại bỏ ảnh mờ, chim quá nhỏ, hoặc bị che khuất nhiều.
 
-**Giai đoạn 2 — Tự động cắt và chuẩn hóa (`0_yolo_shift_crop.py`)**
-
+**Giai đoạn 2 — Tự động cắt vuông bảo toàn tỷ lệ và lọc bằng YOLOv8 (`0_2_yolo_filter_images.py`)**
 ```
-Ảnh gốc → YOLOv8n (class "bird") → Bounding box → Crop → Resize 224×224 → dataset/
+Ảnh gốc → YOLOv8n (class "bird") → Kiểm tra kích thước (>224x224) 
+         → Cắt vuông mở rộng 1.35x căn giữa chim (tránh tràn viền) → Resize 224x224
 ```
 
-Chi tiết kỹ thuật:
-
-1. **Phát hiện chim:** YOLOv8n (`yolov8n.pt`), chỉ lọc `classes=[14]` (nhãn *bird* trong COCO).
-2. **Cắt vùng quan tâm (ROI):** Lấy bounding box có độ tin cậy cao nhất, cắt vùng chim khỏi nền.
-3. **Chuẩn hóa kích thước:** `cv2.resize(..., (224, 224), INTER_AREA)` — đảm bảo mọi ảnh cùng kích thước và tỉ lệ khung hình đối tượng tương đồng.
-4. **Lưu trữ:** Ghi vào thư mục `dataset/`, giữ nguyên tên file gốc để truy vết loài chim.
+*Chi tiết kỹ thuật lọc ảnh:*
+1. **Kiểm tra kích thước gốc:** Chỉ chấp nhận các ảnh có chiều cao và chiều rộng lớn hơn 224 pixels.
+2. **Nhận diện đối tượng:** Dùng YOLOv8n (`yolov8n.pt`), chỉ lọc `classes=[14]` (nhãn *bird*). Lấy bounding box có độ tin cậy cao nhất.
+3. **Cắt hình vuông bảo toàn tỷ lệ:**
+   - Trọng tâm vùng cắt được đặt trùng với trọng tâm đối tượng ($cx$, $cy$).
+   - Kích thước vùng cắt tối ưu được tính bằng `crop_size = 1.35 * max(bw, bh)` (hệ số mở rộng $1.35\times$ giúp chim chiếm khoảng ~55% diện tích ảnh, tạo bối cảnh tự nhiên vừa vặn).
+   - **Ràng buộc quan trọng:** Vùng cắt vuông này phải nằm **hoàn toàn bên trong** ảnh gốc. Nếu bị tràn viền, hệ thống tự động fallback về hệ số $1.0\times$ (chỉ cắt khít bounding box hình vuông). Nếu vẫn bị tràn viền, ảnh bị loại khỏi tập đạt yêu cầu để tránh biến dạng/nhiễu biên.
+4. **Phân loại đầu ra:** 
+   - Ảnh đạt yêu cầu được cắt, resize về $224 \times 224$ pixels bằng nội suy `cv2.INTER_AREA` và ghi vào `data/process_224` (tương đương `data/process_224_(dts)`).
+   - Tên các file được ghi nhận thành hai file danh sách: `data/dat_yeu_cau.txt` và `data/khong_dat_yeu_cau.txt`.
 
 ### 1.3. Lý do các ràng buộc dữ liệu
 
@@ -76,6 +93,7 @@ Chi tiết kỹ thuật:
 |---|---|
 | Cùng kích thước 224×224 | Đồng nhất đầu vào cho các bộ lọc cố định (Gabor, HOG, lưới 4×4) |
 | Cắt theo bounding box | Loại bỏ nền thừa, tập trung đặc trưng vào thân chim |
+| Cắt vuông căn giữa | Giữ nguyên tỷ lệ chiều rộng/cao của chim, tránh méo mó gây nhiễu thông số kích thước cơ thể |
 | Chim đậu, góc ngang | Giảm biến thiên tư thế; đặc trưng hình dáng (Hu Moments, HOG, profile) ổn định hơn |
 | ≥ 500 ảnh | Đủ mẫu để PCA học phân phối đặc trưng và đánh giá truy hồi có ý nghĩa thống kê |
 
@@ -88,7 +106,6 @@ Hệ thống trích xuất **vector đặc trưng 1 460 chiều** từ mỗi ả
 ### 2.1. Tiền xử lý: phân tách foreground (GrabCut)
 
 Trước khi trích đặc trưng, mỗi ảnh được phân đoạn để tách chim khỏi nền:
-
 - **GrabCut** với bounding box khởi tạo (margin 10 px, 5 vòng lặp).
 - **Morphology** (opening + closing, kernel elip 5×5) làm sạch mask.
 - **Fallback Otsu** khi GrabCut thất bại.
@@ -115,7 +132,7 @@ Mask nhị phân đảm bảo đặc trưng chỉ tính trên vùng chim, không
 | Histogram CIE-Lab (L, a, b) | 96 | Mô tả màu gần với cảm nhận thị giác người hơn RGB |
 | Color Moments (Mean, Std, Skewness) × 6 kênh | 18 | Tóm tắt thống kê màu: độ sáng trung bình, độ tương phản, độ lệch phân phối |
 
-**Lý do chọn:** Màu lông là tín hiệu phân biệt mạnh nhất giữa các loài chim (ví dụ: Cardinal đỏ vs Blue Jay xanh). HSV tách sắc độ khỏi độ sáng; Lab ổn định hơn dưới thay đổi ánh sáng nhẹ.
+**Lý do chọn:** Màu lông là tín hiệu phân biệt mạnh nhất giữa các loài chim. HSV tách sắc độ khỏi độ sáng; Lab ổn định hơn dưới thay đổi ánh sáng nhẹ.
 
 #### B. Đặc trưng kết cấu — 179 chiều
 
@@ -127,7 +144,7 @@ Mask nhị phân đảm bảo đặc trưng chỉ tính trên vùng chim, không
 | Gabor filter bank (5 tần số × 8 hướng) | 80 | Vân có hướng và tần số — phân biệt lông mịn vs lông xù |
 | Stripe FFT (phổ tần số 2D) | 64 | Chu kỳ sọc/vân lông lặp lại theo chiều dọc thân |
 
-**Lý do chọn:** Hai loài có thể trùng màu nhưng khác vân lông (ví dụ: hai loài sáng màu). LBP và Gabor bắt chi tiết vi cấu trúc; FFT bắt chu kỳ sọc đặc trưng một số loài.
+**Lý do chọn:** Hai loài có thể trùng màu nhưng khác vân lông. LBP và Gabor bắt chi tiết vi cấu trúc; FFT bắt chu kỳ sọc đặc trưng một số loài.
 
 #### C. Đặc trưng hình dáng — 527 chiều
 
@@ -144,13 +161,12 @@ Mask nhị phân đảm bảo đặc trưng chỉ tính trên vùng chim, không
 #### D. Đặc trưng không gian — 544 chiều
 
 Chia ảnh 224×224 thành lưới **4×4 = 16 ô**. Mỗi ô có foreground chứa:
-
 - HSV histogram cục bộ (24 chiều)
 - LBP histogram cục bộ (10 chiều)
 
 → **34 chiều/ô × 16 ô = 544 chiều**
 
-**Lý do chọn:** Các đặc trưng toàn cục (màu, texture) có thể trùng nhau giữa hai loài khác nhau. Đặc trưng không gian giữ thông tin **bố cục** — ví dụ: đốm vàng ở ngực vs đốm vàng ở đầu là khác biệt quan trọng.
+**Lý do chọn:** Các đặc trưng toàn cục có thể trùng nhau giữa hai loài khác nhau. Đặc trưng không gian giữ thông tin **bố cục** màu và họa tiết trên các bộ phận cơ thể.
 
 ### 2.4. Hợp nhất và giảm chiều
 
@@ -168,14 +184,15 @@ Chia ảnh 224×224 thành lưới **4×4 = 16 ô**. Mỗi ô có foreground ch�
 
 ### 3.1. Kiến trúc lưu trữ lai (Hybrid Storage)
 
-Hệ thống không lưu vector trong SQL mà dùng mô hình **lai** tối ưu cho CBIR:
+Hệ thống kết hợp cơ sở dữ liệu quan hệ với các cấu trúc file chuyên dụng để tối ưu hiệu năng CBIR:
 
 | Thành phần | File | Vai trò |
 |---|---|---|
-| Siêu dữ liệu | `database/database.db` (SQLite) | Quản lý danh mục ảnh |
-| Vector đặc trưng | `database/features.npy` | Ma trận `(N, 512)` float32 |
-| Mô hình chiếu | `database/pca_model.pkl` | PCA đã fit — dùng khi truy vấn |
-| Chỉ mục tìm kiếm | `database/faiss.index` | FAISS IndexFlatIP — cosine nhanh |
+| Siêu dữ liệu | `database/database.db` (SQLite) | Quản lý danh mục ảnh, ánh xạ `ImageID` với `ImagePath` |
+| Vector đặc trưng (Matrix) | `database/features.npy` | Ma trận đặc trưng sau PCA `(N, 512)` kiểu float32 |
+| Bảng tra cứu trực quan | `database/features.csv` | File CSV chứa đầy đủ tên file và giá trị 512 chiều đặc trưng |
+| Mô hình chiếu | `database/pca_model.pkl` | PCA đã học phân phối — dùng chiếu vector truy vấn |
+| Chỉ mục tìm kiếm | `database/faiss.index` | Chỉ mục FAISS IndexFlatIP hỗ trợ so khớp cosine tốc độ cao |
 
 ### 3.2. Schema cơ sở dữ liệu SQLite
 
@@ -186,75 +203,39 @@ CREATE TABLE IF NOT EXISTS Images (
 );
 ```
 
-| Trường | Ý nghĩa |
-|---|---|
-| `ImageID` | Khóa chính tự tăng, định danh duy nhất mỗi ảnh |
-| `ImagePath` | Đường dẫn tương đối tới file ảnh (ví dụ: `dataset\Acadian_Flycatcher_0012_795612.jpg`) |
-
-**Quan hệ logic:** Dòng thứ `i` trong `features.npy` tương ứng bản ghi thứ `i` khi `ORDER BY ImageID` trong bảng `Images`.
+**Quan hệ logic:** Dòng thứ `i` trong ma trận `features.npy` tương ứng với bản ghi thứ `i` khi thực hiện `ORDER BY ImageID` trong bảng `Images`.
 
 ### 3.3. Quy trình xây dựng CSDL (Offline)
 
-Script: `python 1_extract_offline.py`
-
-```
-dataset/ (1246 ảnh)
-    │
-    ├─► Với mỗi ảnh: extract_raw_features() → vector 1460D
-    │       └─► Ghi ImagePath vào SQLite
-    │
-    ├─► Gom ma trận raw (1246 × 1460)
-    │
-    ├─► PCA.fit_transform → ma trận (1246 × 512)
-    │
-    └─► Lưu features.npy, pca_model.pkl, faiss.index, database.db
-```
-
-**Cơ chế Resume:** Nếu bị gián đoạn, script kiểm tra `ImagePath` đã có trong SQLite và bỏ qua ảnh đã xử lý; checkpoint mỗi 20 ảnh.
+Thực hiện thông qua: `python 1_extract_offline.py`
+1. Đọc dữ liệu từ `dataset/` (1239 ảnh đạt chuẩn).
+2. Trích xuất đặc trưng thô 1460D cho từng ảnh, cập nhật đường dẫn vào SQLite.
+3. Fit PCA giảm chiều xuống 512D.
+4. Ghi nhận ma trận `features.npy`, lưu mô hình `pca_model.pkl`.
+5. Tạo và xây dựng chỉ mục `faiss.index` (Cosine).
+*Hỗ trợ Resume:* Tiến trình trích xuất tự động bỏ qua các ảnh đã có trong SQLite nếu bị gián đoạn giữa chừng.
 
 ### 3.4. Cơ chế tìm kiếm ảnh tương đồng
 
 Cho vector truy vấn sau PCA là **q** và ma trận CSDL **X = {x₁, x₂, …, xₙ}**:
 
-**Bước 1 — Chiếu truy vấn:** `q = PCA.transform(raw_query)`
-
-**Bước 2 — Tính độ tương đồng cosine:**
-
-\[
-d_i = 1 - \frac{q \cdot x_i}{\|q\|_2 \|x_i\|_2}
-\]
-
-**Bước 3 — Xếp hạng:** Sắp xếp `d_i` tăng dần, lấy **Top-K** (mặc định K = 5).
-
-**Bước 4 — Ánh xạ kết quả:** Dùng chỉ số `i` tra `ImagePath` trong SQLite → hiển thị ảnh.
-
-**Độ tương đồng hiển thị:**
-
-\[
-\text{similarity}_i = (1 - d_i) \times 100\%
-\]
-
-**Engine tìm kiếm:**
-- Ưu tiên **FAISS IndexFlatIP** (inner product trên vector L2-normalized ≈ cosine) — tìm kiếm chính xác, nhanh.
-- Fallback **SciPy `cdist(metric="cosine")`** khi FAISS không khả dụng.
+1. **Chiếu đặc trưng:** `q = PCA.transform(raw_query)`
+2. **Tính khoảng cách cosine:**
+   \[
+   d_i = 1 - \frac{q \cdot x_i}{\|q\|_2 \|x_i\|_2}
+   \]
+3. **Xếp hạng:** Sắp xếp khoảng cách $d_i$ tăng dần, lấy Top-5 kết quả.
+4. **Engine tìm kiếm:**
+   - **Ưu tiên:** Sử dụng thư viện **FAISS IndexFlatIP** (Inner Product trên vector chuẩn hóa L2 tương đương với Cosine similarity) cho tốc độ tìm kiếm cực nhanh.
+   - **Fallback:** Tự động chuyển sang hàm `cdist(metric="cosine")` của SciPy khi hệ thống thiếu thư viện FAISS.
 
 ---
 
-## 4. Hệ thống tìm kiếm ảnh chim
+## 4. Hệ thống tìm kiếm ảnh chim (Online)
 
-### 4.1. Mô tả chức năng
-
-| Thành phần | Mô tả |
-|---|---|
-| **Đầu vào** | Một ảnh chim mới (loài đã có hoặc chưa có trong `dataset/`) |
-| **Đầu ra** | **5 ảnh** trong CSDL giống nhất, xếp giảm dần theo độ tương đồng nội dung |
-| **Giao diện** | Web app Streamlit (`2_app.py`) |
-| **Trường hợp loài mới** | Hệ thống vẫn trả về 5 ảnh *gần nhất về nội dung* (màu, hình dáng, vân lông), không yêu cầu loài trùng khớp |
-
-### 4.2. Sơ đồ khối hệ thống
+### 4.1. Sơ đồ khối hệ thống
 
 #### Tổng quan hai giai đoạn
-
 ```mermaid
 flowchart TB
     subgraph OFFLINE["Giai đoạn OFFLINE — Xây dựng CSDL"]
@@ -280,8 +261,7 @@ flowchart TB
     A8 -.->|nạp sẵn| B4
 ```
 
-#### Quy trình chi tiết khi người dùng tìm kiếm
-
+#### Quy trình chi tiết khi tìm kiếm
 ```mermaid
 flowchart LR
     Q[Ảnh query] --> R[Resize 224×224]
@@ -300,125 +280,108 @@ flowchart LR
     S --> O[Kết quả + điểm %]
 ```
 
-### 4.3. Kết quả trung gian của quá trình tìm kiếm
+### 4.2. Giao diện Web App Streamlit (`2_app.py`)
 
-Trong quá trình xử lý một ảnh truy vấn, hệ thống sinh ra các kết quả trung gian sau:
+Web App cung cấp các tính năng:
+- **Tải lên ảnh truy vấn:** Hỗ trợ kéo thả ảnh JPEG/PNG.
+- **Hiển thị kết quả trung gian:** Cho phép xem ảnh resize 224x224 và mặt nạ GrabCut phân tách chim.
+- **Top-5 kết quả giống nhất:** Hiển thị danh sách ảnh kèm tỷ lệ phần trăm tương đồng:
+  \[
+  \text{similarity}_i = (1 - d_i) \times 100\%
+  \]
+- **Bảng so sánh chi tiết chỉ số:** Hỗ trợ phân tích khoảng cách Euclidean (L2), Manhattan (L1), Cosine Distance, Dot Product và các phân phối của vector đặc trưng.
 
-#### Bước 1 — Tiền xử lý ảnh
+### 4.3. Kết quả đánh giá định lượng thực tế
 
-| Kết quả trung gian | Mô tả | Công cụ kiểm tra |
-|---|---|---|
-| Ảnh resize 224×224 | Chuẩn hóa kích thước đầu vào | Tự động trong pipeline |
-| Mask GrabCut | Ảnh nhị phân tách chim/nền | `debug_grabcut_preview.py` → `data/result_grabcut/` |
+Hệ thống được đánh giá bằng **weak labels** (suy ra loài từ thư mục cha của tên file) trên **100 truy vấn ngẫu nhiên** (hạt giống seed=42):
 
-#### Bước 2 — Trích xuất đặc trưng
+> [!NOTE]
+> Kết quả đánh giá thực tế dưới đây được trích xuất từ file [results/quantitative_summary.md](file:///c:/Bird-Search-System/bird-search-system/results/quantitative_summary.md) (cấu hình `C0_full` với dữ liệu thực tế 1239 ảnh):
 
-| Kết quả trung gian | Kích thước | Ý nghĩa |
+| Chỉ số đánh giá | Giá trị thực tế | Ý nghĩa |
 |---|---:|---|
-| Vector Color | 210 | Phân bố màu lông truy vấn |
-| Vector Texture | 179 | Vân lông, hướng cạnh |
-| Vector Shape | 527 | Silhouette, profile thân chim |
-| Vector Spatial | 544 | Bố cục màu–vân theo vùng |
-| **Vector raw hợp nhất** | **1 460** | Vector đặc trưng đầy đủ, L2-normalized |
+| **Precision@1 (P@1)** | **6.00%** | Tỉ lệ ảnh đầu tiên trùng loài với ảnh truy vấn |
+| **Precision@5 (P@5)** | **6.60%** | Tỉ lệ ảnh trùng loài trong Top-5 kết quả |
+| **Precision@10 (P@10)** | **5.50%** | Tỉ lệ ảnh trùng loài trong Top-10 kết quả |
+| **Precision@20 (P@20)** | **4.45%** | Tỉ lệ ảnh trùng loài trong Top-20 kết quả |
+| **mAP@5** | **3.40%** | Độ chính xác trung bình trung bình tại K=5 |
+| **mAP@10** | **2.39%** | Độ chính xác trung bình trung bình tại K=10 |
+| **Thời gian tìm kiếm (Search Latency)** | **~0.59 ms / query** | Tốc độ so khớp đặc trưng sử dụng chỉ mục |
 
-#### Bước 3 — Chiếu PCA
+*Lưu ý: Chỉ số Precision phản ánh độ khớp chính xác về loài (Weak Label). Trên thực tế, do đặc trưng thị giác CV cổ điển (màu sắc, kết cấu toàn cục) có độ tương đồng giữa các loài chim gần nhau, hệ thống luôn trả về các ảnh giống nhất về mặt hình học và thị giác.*
 
-| Kết quả trung gian | Kích thước | Ý nghĩa |
-|---|---:|---|
-| Vector PCA | 512 | Vector trong không gian đặc trưng đã giảm chiều, dùng để so khớp |
+---
 
-#### Bước 4 — Tìm kiếm và xếp hạng
+## 5. Các Script Tiện Ích & Bổ Trợ
 
-| Kết quả trung gian | Mô tả |
-|---|---|
-| Cosine distance `d₁…d₅` | Khoảng cách từ query đến từng ảnh trong CSDL (nhỏ hơn = giống hơn) |
-| Cosine similarity `%` | `(1 - dᵢ) × 100%` — hiển thị trên giao diện |
-| Chỉ số xếp hạng | Thứ tự `#1` → `#5` theo độ tương đồng giảm dần |
+Để hỗ trợ vận hành và quản lý dữ liệu trực quan, hệ thống tích hợp các công cụ bổ trợ nằm trong thư mục `file_support/` và root:
 
-#### Bước 5 — Bảng so sánh chỉ số (trong giao diện)
+### 5.1. Lọc và chuẩn hóa dữ liệu ảnh (`0_2_yolo_filter_images.py`)
+Hỗ trợ tự động hóa khâu tiền xử lý, lọc bỏ các ảnh không đạt kích thước hoặc có nguy cơ bị biến dạng khi crop:
+```bash
+python 0_2_yolo_filter_images.py
+```
+*Đầu ra:* Danh sách phân loại lưu tại `data/dat_yeu_cau.txt` và `data/khong_dat_yeu_cau.txt`. Ảnh đạt chuẩn lưu vào `data/process_224`.
 
-Ứng dụng Streamlit cung cấp nút **"Hiển thị bảng so sánh chỉ số"** với các metric giữa ảnh query và từng kết quả Top-K:
+### 5.2. Chuyển đổi ma trận đặc trưng sang CSV (`file_support/convert_features_to_csv.py`)
+Xuất ma trận đặc trưng `features.npy` dạng binary thành file [database/features.csv](file:///c:/Bird-Search-System/bird-search-system/database/features.csv) trực quan, kết hợp `ImageID` và `ImagePath` tương ứng từ SQLite để dễ dàng kiểm tra các chiều đặc trưng (`Dim_0` đến `Dim_511`):
+```bash
+python file_support/convert_features_to_csv.py
+```
 
-| Chỉ số | Ý nghĩa |
-|---|---|
-| Cosine Similarity (%) | Độ tương đồng nội dung (metric chính) |
-| Cosine Distance | Khoảng cách cosine |
-| Euclidean Distance | Khoảng cách L2 trong không gian PCA |
-| L1 Distance | Khoảng cách Manhattan |
-| Dot Product | Tích vô hướng hai vector |
-| Feature Mean / Std | Thống kê phân phối vector đặc trưng |
-
-### 4.4. Kết quả đánh giá định lượng
-
-Đánh giá bằng **weak labels** (suy ra loài từ tên file) trên 100 truy vấn ngẫu nhiên:
-
-| Chỉ số | K = 1 | K = 5 | K = 10 |
-|---|---:|---:|---:|
-| Precision@K | 100% | 100% | 100% |
-| mAP@K | 100% | 100% | 100% |
-| Thời gian extract/query | ~6 308 ms | — | — |
-| Thời gian search | ~0.8 ms | — | — |
-
-> *Lưu ý: Metric 100% phản ánh đánh giá weak-label trên tập có cấu trúc tên file rõ ràng; với ảnh loài hoàn toàn mới, hệ thống trả về ảnh gần nhất về đặc trưng thị giác thay vì đảm bảo đúng loài.*
-
-Chạy đánh giá: `python evaluate_weak_labels.py --query-count 100 --seed 42`
+### 5.3. Xây dựng riêng chỉ mục FAISS (`file_support/build_faiss_only.py`)
+Khi cần cập nhật hoặc xây dựng riêng file chỉ mục tìm kiếm nhanh `faiss.index` từ file `features.npy` có sẵn mà không cần chạy lại toàn bộ pipeline trích xuất offline:
+```bash
+python file_support/build_faiss_only.py
+```
 
 ---
 
 ## Hướng dẫn cài đặt và sử dụng
 
-### Yêu cầu
+### Yêu cầu hệ thống
+- Python 3.8+ (Khuyên dùng Python 3.12 hoặc 3.13)
+- Trình quản lý thư viện `pip`
 
-- Python 3.8+
-- pip
-
-### Cài đặt
+### 1. Cài đặt môi trường
 
 ```bash
 cd bird-search-system
 python -m venv venv
 
-# Windows
+# Kích hoạt môi trường (Windows)
 venv\Scripts\activate
 
+# Cài đặt các thư viện cơ bản
 pip install -r requirements.txt
 ```
 
-### Chạy hệ thống
+> [!IMPORTANT]
+> **Lưu ý cài đặt thư viện FAISS trên Windows:**
+> Đối với môi trường Windows (ví dụ Python 3.13), bạn nên cài đặt thư viện FAISS thông qua lệnh:
+> ```bash
+> python -m pip install faiss-cpu
+> ```
 
+### 2. Sử dụng hệ thống
+
+#### Bước 1: Chuẩn bị dữ liệu và Trích xuất đặc trưng Offline
+Đặt các ảnh chim đã chuẩn hóa vào thư mục `dataset/` (hoặc chạy lọc ảnh bằng `0_2_yolo_filter_images.py`). Sau đó chạy script trích xuất để tạo CSDL:
 ```bash
-# Bước 1 (tùy chọn): Tiền xử lý ảnh gốc bằng YOLO
-python 0_yolo_shift_crop.py
-
-# Bước 2: Xây dựng CSDL đặc trưng
 python 1_extract_offline.py
+```
+*Kết quả:* Hệ thống sẽ sinh ra các file `database.db`, `features.npy`, `pca_model.pkl` và `faiss.index` bên trong thư mục `database/`.
 
-# Bước 3: Chạy ứng dụng tìm kiếm
+#### Bước 2: Chạy Web App Tìm kiếm
+Khởi chạy ứng dụng Streamlit:
+```bash
 streamlit run 2_app.py
 ```
+Mở trình duyệt truy cập: `http://localhost:8501` để bắt đầu tải ảnh và tìm kiếm.
 
-Truy cập: `http://localhost:8501`
-
-### Thư viện chính
-
-| Thư viện | Vai trò |
-|---|---|
-| OpenCV | Xử lý ảnh, GrabCut, Sobel, contour |
-| scikit-image | LBP, GLCM, Gabor, HOG |
-| scikit-learn | PCA giảm chiều |
-| NumPy / SciPy | Ma trận vector, FFT, khoảng cách |
-| FAISS | Chỉ mục tìm kiếm cosine |
-| SQLite | Siêu dữ liệu ảnh |
-| Streamlit | Giao diện web |
-| Ultralytics (YOLOv8) | Phát hiện và cắt chim khi tiền xử lý |
-
----
-
-## Tổng kết
-
-Hệ thống đáp ứng đầy đủ yêu cầu đề bài:
-
-1. **Dữ liệu:** 1 246 ảnh chim, 122 loài, đồng kích thước 224×224, chim đậu góc ngang.
-2. **Đặc trưng:** 4 nhóm (màu, kết cấu, hình dáng, không gian) — 1 460 chiều, giảm còn 512 chiều bằng PCA.
-3. **CSDL:** SQLite + NumPy + FAISS, tìm kiếm cosine similarity.
-4. **Tìm kiếm:** Upload ảnh → trích đặc trưng → Top-5 kết quả tương đồng, kèm kết quả trung gian (mask, vector, điểm số, bảng so sánh).
+#### Bước 3: Đánh giá chất lượng hệ thống (Weak-label Evaluation)
+Chạy đánh giá chất lượng truy hồi ngẫu nhiên trên 100 truy vấn:
+```bash
+python evaluate_weak_labels.py --query-count 100 --seed 42
+```
+*Kết quả:* Báo cáo hiệu năng chi tiết sẽ được tự động xuất ra thư mục `results/`.
