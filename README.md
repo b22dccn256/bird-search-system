@@ -2,6 +2,54 @@
 
 Hệ thống **CBIR (Content-Based Image Retrieval)** tìm kiếm ảnh chim tương đồng dựa trên nội dung hình ảnh, sử dụng các đặc trưng Computer Vision cổ điển (không dùng Deep Learning cho bước trích xuất đặc trưng). Đầu vào là một ảnh chim bất kỳ; đầu ra là **5 ảnh giống nhất** trong cơ sở dữ liệu, xếp theo độ tương đồng giảm dần.
 
+> [!CAUTION]
+> ### 🚨 LƯU Ý ĐẶC BIỆT QUAN TRỌNG KHI BÁO CÁO (THẦY HÓA)
+> 
+> *   **Quy tắc sống còn:** **Chỉ trình bày và nói những phần mình hiểu thật rõ.** Nếu không nắm vững bản chất, tuyệt đối không tự ý giải thích lan man (Thầy vặn hỏi sâu mà không trả lời được là sẽ bị đánh giá rất thấp $\rightarrow$ nguy cơ **OUT** trực tiếp).
+> 
+> ---
+> 
+> #### 📸 Câu 1: Dữ liệu (Data) là gì? Tách nền bằng cách nào? Minh họa trực quan?
+> *   **Data của dự án:** Show thư mục [dataset/](file:///c:/Bird-Search-System/bird-search-system/dataset) chứa **1.239 ảnh chim** đã chuẩn hóa kích thước $224 \times 224$ pixels thuộc **122 loài**.
+> *   **Tách nền thế nào:** Sử dụng thuật toán phân đoạn ảnh **GrabCut** (với bounding box tự động từ YOLOv8) kết hợp xử lý hình thái học (**Morphological Opening/Closing** bằng kernel Ellipse $5 \times 5$) để tách chim (foreground) ra khỏi nền (background). Có cơ chế tự động fallback sang phân ngưỡng **Otsu** nếu GrabCut lỗi hoặc trả về mặt nạ rỗng.
+> *   **Minh họa tách nền:** 
+>     *   Cách 1: Mở trực tiếp thư mục ảnh trung gian lưu ảnh debug tại [data/result_grabcut/](file:///c:/Bird-Search-System/bird-search-system/data/result_grabcut) để thầy thấy trực quan (ảnh gốc, mặt nạ nhị phân và ảnh tách nền).
+>     *   Cách 2: Chạy trực tiếp script preview bằng lệnh: `python debug_grabcut_preview.py` để biểu diễn sinh động quá trình phân đoạn ảnh chim.
+> 
+> ---
+> 
+> #### 🗄️ Câu 2: Mô hình Cơ sở dữ liệu (Database) sử dụng cấu trúc gì? Tại sao? Cách liên kết và lưu trữ vector?
+> *   **Mô hình sử dụng:** Sử dụng **Kiến trúc lưu trữ lai (Hybrid Storage)** kết hợp giữa CSDL quan hệ siêu dữ liệu **SQLite** (`database.db`) và CSDL vector dạng tệp nhị phân phẳng **NumPy** (`features.npy`) kết hợp chỉ mục tìm kiếm nhanh **FAISS** (`faiss.index`).
+> *   **Tại sao lại chọn mô hình Hybrid này?** 
+>     *   SQLite cực kỳ nhẹ, không cần cài đặt máy chủ, rất tốt để quản lý thông tin hình ảnh và đường dẫn (`ImagePath`) tránh trùng lặp bản ghi (ràng buộc `UNIQUE`).
+>     *   Tuy nhiên, các hệ quản trị CSDL quan hệ như SQL không tối ưu cho việc tính toán ma trận khoảng cách vector lớn. Việc tách ma trận đặc trưng nén PCA 512D ra file NumPy nhị phân `.npy` giúp nạp thẳng lên bộ nhớ RAM dưới dạng mảng đa chiều để thực hiện tính toán vector hóa (vectorized operations) song song ở tốc độ tối đa.
+> *   **Cách liên kết và thứ tự lưu trữ:**
+>     *   SQLite chỉ lưu bảng `Images` (gồm `ImageID` khóa chính tự tăng và `ImagePath` tương đối).
+>     *   *Quan hệ logic:* Dòng thứ $i$ (bắt đầu từ index 0) trong ma trận `features.npy` và chỉ mục FAISS tương ứng chính xác với bản ghi thứ $i$ khi truy vấn danh sách sắp xếp theo ID: `SELECT ImageID, ImagePath FROM Images ORDER BY ImageID`.
+> *   **Giải thích cách tính và thứ tự lưu một cột (Ví dụ: Dim_0):**
+>     *   Vector thô lúc đầu trích xuất có **1.460 chiều** gồm: *Color (210D)*, *Texture (179D)*, *Shape (527D)*, *Spatial (544D)*.
+>     *   Hệ thống dùng thuật toán nén thông tin tuyến tính **PCA** huấn luyện offline nén từ 1.460 chiều xuống còn **512 chiều** (lưu trong ma trận `.npy` từ cột `Dim_0` đến `Dim_511`).
+>     *   *Cách tính:* Mỗi cột `Dim_j` (ví dụ `Dim_0`) là kết quả chiếu tuyến tính của vector 1.460 chiều ban đầu lên hướng trục phương sai lớn thứ $j$ được xác định bởi ma trận trọng số (eigenvectors) học từ tập huấn luyện. Giá trị cột này phản ánh một thành phần đặc trưng cô đọng kết hợp cả màu sắc, kết cấu và hình dạng của ảnh chim.
+> 
+> ---
+> 
+> #### 💻 Câu 3: Luồng chạy của code (Upload $\rightarrow$ Trả kết quả) & Công thức so khớp Cosine
+> *   **Show code luồng chạy (Vừa chỉ code vừa giải thích):**
+>     1.  Mở [2_app.py](file:///c:/Bird-Search-System/bird-search-system/2_app.py): Chỉ vào phần Streamlit `st.file_uploader` nhận tệp upload.
+>     2.  Hệ thống ghi tệp ảnh tạm thời ra đĩa và truyền đường dẫn vào hàm trích xuất đặc trưng `extract_raw_features` trong tệp [feature_extractors.py](file:///c:/Bird-Search-System/bird-search-system/feature_extractors.py).
+>     3.  Sau khi nhận được vector đặc trưng thô 1.460 chiều $\rightarrow$ đi qua hàm giảm chiều `pca.transform(raw)` để đưa về vector 512 chiều.
+>     4.  Truyền vector 512 chiều này vào hàm `search_topk` so khớp với ma trận CSDL.
+> *   **Cách tính công thức Cosine Similarity:**
+>     *   Khoảng cách Cosine giữa vector truy vấn $\mathbf{q}$ và vector ảnh CSDL $\mathbf{x}_i$:
+>         \[
+>         d_i = 1 - \cos(\theta) = 1 - \frac{\mathbf{q} \cdot \mathbf{x}_i}{\|\mathbf{q}\|_2 \|\mathbf{x}_i\|_2}
+>         \]
+>     *   Độ tương đồng hiển thị (%) trên web app: $\text{similarity}_i = (1 - d_i) \times 100\%$.
+> *   **Hiểu rõ thông số thiết lập (Settings):**
+>     *   `use_faiss`: Hệ thống tự kiểm tra thư viện FAISS cài đặt trên máy. Nếu có FAISS (`faiss.index`), nó chuẩn hóa L2 các vector đặc trưng và thực hiện so khớp exact cosine tốc độ cao qua lớp `IndexFlatIP` (Tích vô hướng).
+>     *   *Fallback:* Nếu môi trường máy chạy thiếu FAISS, code tự động dùng hàm brute-force `cdist(..., metric="cosine")` của SciPy.
+>     *   `top_k`: Tham số slider trên sidebar Streamlit cho phép người dùng điều chỉnh số kết quả hiển thị mong muốn (mặc định là Top-5).
+
 ---
 
 ## Cấu trúc dự án
@@ -184,50 +232,142 @@ Chia ảnh 224×224 thành lưới **4×4 = 16 ô**. Mỗi ô có foreground ch�
 
 ### 3.1. Kiến trúc lưu trữ lai (Hybrid Storage)
 
-Hệ thống kết hợp cơ sở dữ liệu quan hệ với các cấu trúc file chuyên dụng để tối ưu hiệu năng CBIR:
+Để tối ưu hóa hiệu năng lưu trữ quan hệ và xử lý tính toán vector hiệu năng cao trong bài toán CBIR, hệ thống kết hợp cơ sở dữ liệu quan hệ nhẹ với các định dạng lưu trữ chuyên dụng:
 
-| Thành phần | File | Vai trò |
-|---|---|---|
-| Siêu dữ liệu | `database/database.db` (SQLite) | Quản lý danh mục ảnh, ánh xạ `ImageID` với `ImagePath` |
-| Vector đặc trưng (Matrix) | `database/features.npy` | Ma trận đặc trưng sau PCA `(N, 512)` kiểu float32 |
-| Bảng tra cứu trực quan | `database/features.csv` | File CSV chứa đầy đủ tên file và giá trị 512 chiều đặc trưng |
-| Mô hình chiếu | `database/pca_model.pkl` | PCA đã học phân phối — dùng chiếu vector truy vấn |
-| Chỉ mục tìm kiếm | `database/faiss.index` | Chỉ mục FAISS IndexFlatIP hỗ trợ so khớp cosine tốc độ cao |
+| Thành phần | Đường dẫn tệp | Định dạng / Thư viện | Quy mô / Thông số | Vai trò |
+| :--- | :--- | :--- | :--- | :--- |
+| **Siêu dữ liệu (Metadata)** | `database/database.db` | SQLite 3 | 1.239 bản ghi | Quản lý danh mục ảnh, lưu trữ ánh xạ duy nhất giữa ID ảnh và đường dẫn tệp. |
+| **Ma trận đặc trưng** | `database/features.npy` | NumPy Binary (`.npy`) | Ma trận `(1239, 512)` kiểu `float32` | Lưu trữ tập hợp các vector đặc trưng sau khi đã giảm chiều bằng PCA. |
+| **Bảng tra cứu dẹt** | `database/features.csv` | CSV (Comma-Separated Values) | 1.239 hàng $\times$ 514 cột | Hỗ trợ xem trực quan và đối chiếu nhanh các chiều đặc trưng với đường dẫn ảnh tương ứng. |
+| **Mô hình giảm chiều** | `database/pca_model.pkl` | Python Pickle (`.pkl`) | Mô hình Scikit-Learn PCA | Lưu trạng thái mô hình PCA đã fit để biến đổi vector truy vấn online. |
+| **Chỉ mục vector** | `database/faiss.index` | FAISS IndexFlatIP (Facebook AI) | Chỉ mục Cosine 512 chiều | Hỗ trợ tìm kiếm láng giềng gần nhất (so khớp vector) ở tốc độ micro-giây. |
 
-### 3.2. Schema cơ sở dữ liệu SQLite
+---
 
+### 3.2. Chi tiết Cơ sở dữ liệu SQLite (`database.db`)
+
+Cơ sở dữ liệu SQLite chịu trách nhiệm lưu trữ cấu trúc quan hệ siêu dữ liệu của ảnh trong tập dữ liệu.
+
+#### 3.2.1. Lược đồ bảng (Schema)
+
+##### Bảng `Images`
+Bảng lưu trữ thông tin đường dẫn và định danh của từng hình ảnh đã được xử lý thành công.
 ```sql
-CREATE TABLE IF NOT EXISTS Images (
+CREATE TABLE Images (
     ImageID   INTEGER PRIMARY KEY AUTOINCREMENT,
     ImagePath TEXT    NOT NULL UNIQUE
 );
 ```
 
-**Quan hệ logic:** Dòng thứ `i` trong ma trận `features.npy` tương ứng với bản ghi thứ `i` khi thực hiện `ORDER BY ImageID` trong bảng `Images`.
+##### Bảng `sqlite_sequence`
+Bảng hệ thống được SQLite tự động tạo để quản lý và theo dõi chỉ số tự tăng (`AUTOINCREMENT`) cho khóa chính `ImageID` của bảng `Images`.
 
-### 3.3. Quy trình xây dựng CSDL (Offline)
+#### 3.2.2. Chi tiết các trường dữ liệu và ràng buộc
 
-Thực hiện thông qua: `python 1_extract_offline.py`
-1. Đọc dữ liệu từ `dataset/` (1239 ảnh đạt chuẩn).
-2. Trích xuất đặc trưng thô 1460D cho từng ảnh, cập nhật đường dẫn vào SQLite.
-3. Fit PCA giảm chiều xuống 512D.
-4. Ghi nhận ma trận `features.npy`, lưu mô hình `pca_model.pkl`.
-5. Tạo và xây dựng chỉ mục `faiss.index` (Cosine).
-*Hỗ trợ Resume:* Tiến trình trích xuất tự động bỏ qua các ảnh đã có trong SQLite nếu bị gián đoạn giữa chừng.
+*   **`ImageID` (Kiểu `INTEGER`, `PRIMARY KEY`, `AUTOINCREMENT`):**
+    *   Mục đích: Định danh duy nhất tăng dần cho mỗi ảnh chim được thêm vào CSDL.
+    *   Ràng buộc: Bắt buộc khóa chính, tự động tăng giá trị khi chèn bản ghi mới.
+*   **`ImagePath` (Kiểu `TEXT`, `NOT NULL`, `UNIQUE`):**
+    *   Mục đích: Lưu trữ đường dẫn tương đối của tệp ảnh tính từ thư mục gốc của dự án (ví dụ: `dataset\Acadian_Flycatcher_0012_795612.jpg`).
+    *   Ràng buộc: Không được để trống (`NOT NULL`) và không được trùng lặp (`UNIQUE`).
+    *   Chỉ mục tự động: Hệ thống tự sinh chỉ mục duy nhất `sqlite_autoindex_Images_1` trên trường này nhằm đảm bảo ràng buộc UNIQUE và tối ưu hóa tốc độ tìm kiếm bản ghi theo đường dẫn ảnh khi chạy script offline (hỗ trợ tính năng resume).
 
-### 3.4. Cơ chế tìm kiếm ảnh tương đồng
+---
 
-Cho vector truy vấn sau PCA là **q** và ma trận CSDL **X = {x₁, x₂, …, xₙ}**:
+### 3.3. Chi tiết cấu trúc dữ liệu đặc trưng
 
-1. **Chiếu đặc trưng:** `q = PCA.transform(raw_query)`
-2. **Tính khoảng cách cosine:**
-   \[
-   d_i = 1 - \frac{q \cdot x_i}{\|q\|_2 \|x_i\|_2}
-   \]
-3. **Xếp hạng:** Sắp xếp khoảng cách $d_i$ tăng dần, lấy Top-5 kết quả.
-4. **Engine tìm kiếm:**
-   - **Ưu tiên:** Sử dụng thư viện **FAISS IndexFlatIP** (Inner Product trên vector chuẩn hóa L2 tương đương với Cosine similarity) cho tốc độ tìm kiếm cực nhanh.
-   - **Fallback:** Tự động chuyển sang hàm `cdist(metric="cosine")` của SciPy khi hệ thống thiếu thư viện FAISS.
+#### 3.3.1. Ma trận NumPy nhị phân (`features.npy`)
+*   **Kiểu dữ liệu:** Số thực dấu phẩy động 32-bit (`float32`), khi tải vào bộ nhớ RAM trong Streamlit App được xử lý dưới dạng `float64` để đảm bảo độ chính xác tính toán khoảng cách.
+*   **Hình dạng (Shape):** `(N, 512)` với $N = 1239$ ảnh.
+*   **Nội dung:** Mỗi dòng $i$ là một vector đặc trưng 512 chiều thu được từ việc chiếu vector thô 1.460 chiều qua mô hình PCA.
+
+#### 3.3.2. Bảng CSV đặc trưng trực quan (`features.csv`)
+Tệp được sinh ra bởi script tiện ích để phục vụ mục đích gỡ lỗi và đối chiếu.
+*   **Cấu trúc cột:**
+    *   `ImageID`: ID tương ứng của ảnh lấy từ SQLite.
+    *   `ImagePath`: Đường dẫn tương đối lấy từ SQLite.
+    *   `Dim_0` đến `Dim_511`: Các cột giá trị số thực đại diện cho từng chiều đặc trưng sau PCA.
+
+#### 3.3.3. Chỉ mục vector FAISS (`faiss.index`)
+*   **Loại chỉ mục:** `IndexFlatIP` (Exact Inner Product Search).
+*   **Cơ chế so khớp:** Do toàn bộ các vector đặc trưng sau PCA đều được chuẩn hóa L2 ($L_2$ Normalization) trước khi lưu vào chỉ mục, phép tính Inner Product (tích vô hướng) giữa vector truy vấn chuẩn hóa $\mathbf{q}$ và vector CSDL chuẩn hóa $\mathbf{x}_i$ sẽ tương đương chính xác với độ tương đồng Cosine (Cosine Similarity):
+    \[
+    \text{InnerProduct}(\mathbf{q}, \mathbf{x}_i) = \mathbf{q} \cdot \mathbf{x}_i = \cos(\theta)
+    \]
+*   **Hiệu năng:** Cho kết quả tìm kiếm chính xác tuyệt đối (exact search) với độ trễ cực thấp ($\approx 0.59\text{ ms}$).
+
+---
+
+### 3.4. Ánh xạ và Quan hệ logic (Index Alignment)
+
+Hệ thống sử dụng cơ chế liên kết chỉ số (Index-based Alignment) giữa cơ sở dữ liệu quan hệ SQLite và các mảng đặc trưng nhị phân:
+
+```
+[ SQLite: database.db ]                              [ Numpy: features.npy ] & [ FAISS: faiss.index ]
++---------+----------------------------+             +----------------------------------------------+
+| ImageID | ImagePath                  |             | Index 0:   [ 512-dim vector float32 ]        |
++---------+----------------------------+             | Index 1:   [ 512-dim vector float32 ]        |
+| 1       | dataset\Acadian_Fly...     | ----------> | Index 2:   [ 512-dim vector float32 ]        |
+| 2       | dataset\Acadian_Fly...     | ----------> | Index 3:   [ 512-dim vector float32 ]        |
+| 3       | dataset\Acadian_Fly...     | ----------> | ...                                          |
+| ...     | ...                        |             +----------------------------------------------+
++---------+----------------------------+
+```
+
+*   **Nguyên tắc ánh xạ:** Dòng thứ $i$ (0-indexed) trong ma trận `features.npy` và chỉ mục `faiss.index` tương ứng chính xác với bản ghi thứ $i$ trả về khi thực hiện câu lệnh SQL:
+    ```sql
+    SELECT ImageID, ImagePath FROM Images ORDER BY ImageID;
+    ```
+*   **Tính toàn vẹn dữ liệu:** Quy trình này được đảm bảo nghiêm ngặt trong pha Offline. Khi tìm kiếm trực tuyến (Online):
+    1. Công cụ tìm kiếm (FAISS hoặc SciPy) trả về các chỉ số vị trí tương đồng nhất (ví dụ: `idx = [0, 15, 30]`).
+    2. Ứng dụng Streamlit sử dụng các chỉ số này để truy xuất trực tiếp các đường dẫn ảnh `ImagePath` tương ứng từ danh sách đã tải từ SQLite.
+
+---
+
+### 3.5. Quy trình xây dựng CSDL (Offline)
+
+Thực hiện thông qua lệnh: `python 1_extract_offline.py`
+1.  **Quét Dữ liệu:** Đọc toàn bộ ảnh từ thư mục `dataset/` (đã chuẩn hóa 1.239 ảnh).
+2.  **Khởi tạo SQLite:** Tạo bảng `Images` nếu chưa tồn tại.
+3.  **Trích xuất & Lưu trữ metadata:** Trích xuất đặc trưng thô 1.460 chiều cho từng ảnh. Với mỗi ảnh xử lý thành công, đường dẫn tương đối được thêm vào bảng `Images` (SQLite).
+    *   *Cơ chế Resume:* Nếu tiến trình bị gián đoạn, khi chạy lại, script sẽ so khớp danh sách tệp trong thư mục với các đường dẫn `ImagePath` đã tồn tại trong SQLite để bỏ qua các ảnh đã xử lý trước đó, nạp tiếp file checkpoint `raw_features.npy` để tiếp tục.
+4.  **Huấn luyện PCA:** Thu gom toàn bộ ma trận đặc trưng thô, thực hiện chuẩn hóa L2, fit mô hình PCA để giảm chiều xuống còn 512 chiều.
+5.  **Lưu kết quả đặc trưng:** Ghi file ma trận đặc trưng giảm chiều `features.npy` và tệp mô hình `pca_model.pkl`.
+6.  **Xây dựng Chỉ mục FAISS:** Tạo chỉ mục `faiss.index` từ các vector đặc trưng PCA đã chuẩn hóa L2 phục vụ so khớp Cosine nhanh.
+
+---
+
+### 3.6. Cơ chế tìm kiếm ảnh tương đồng (Online Search)
+
+Khi người dùng upload một hình ảnh truy vấn $\mathbf{q}_{\text{raw}}$:
+
+1.  **Trích xuất đặc trưng:** Ảnh truy vấn được đi qua cùng quy trình GrabCut và trích xuất đặc trưng thô để nhận vector $\mathbf{q}_{\text{raw}} \in \mathbb{R}^{1460}$.
+2.  **Giảm chiều dữ liệu:** Vector thô được biến đổi qua mô hình PCA đã tải:
+    \[
+    \mathbf{q} = \text{PCA.transform}(\mathbf{q}_{\text{raw}}) \in \mathbb{R}^{512}
+    \]
+3.  **Tính khoảng cách Cosine:**
+    *   Với mỗi ảnh $i$ trong cơ sở dữ liệu có vector đặc trưng $\mathbf{x}_i$, khoảng cách Cosine được tính như sau:
+        \[
+        d_i = 1 - \cos(\theta) = 1 - \frac{\mathbf{q} \cdot \mathbf{x}_i}{\|\mathbf{q}\|_2 \|\mathbf{x}_i\|_2}
+        \]
+4.  **Xếp hạng & Truy vấn:**
+    *   Các khoảng cách $d_i$ được sắp xếp tăng dần để tìm Top-K kết quả gần nhất ($d_i$ nhỏ nhất tương đương độ tương đồng lớn nhất).
+    *   **Engine chính (FAISS):** Thực hiện so khớp cosine thông qua phép tìm kiếm tích vô hướng (Inner Product) trên `faiss.index` của các vector đã chuẩn hóa L2:
+        ```python
+        faiss.normalize_L2(q)
+        scores, idx = faiss_index.search(q, top_k)
+        dists = 1.0 - scores
+        ```
+    *   **Engine dự phòng (SciPy):** Khi thiếu thư viện FAISS, hệ thống tự động fallback sang tính toán brute-force qua khoảng cách cosine của SciPy:
+        ```python
+        dists = cdist(q.reshape(1, -1), db_matrix, metric="cosine").flatten()
+        idx = np.argsort(dists)[:top_k]
+        ```
+5.  **Ánh xạ hiển thị:** Tra cứu `ImagePath` tương ứng với các chỉ số `idx` từ SQLite để hiển thị danh sách ảnh chim giống nhất cùng tỷ lệ tương đồng:
+    \[
+    \text{similarity}_i = (1 - d_i) \times 100\%
+    \]
 
 ---
 
