@@ -76,6 +76,8 @@ bird-search-system/
 │   ├── quantitative_summary.csv # Kết quả đánh giá tổng hợp dạng CSV
 │   └── quantitative_summary.md  # Báo cáo đánh giá tổng hợp dạng Markdown
 │
+├── review_question/             # Thư mục chứa tài liệu, hình ảnh và video chuẩn bị báo cáo bảo vệ
+│
 ├── file_support/                # Thư mục chứa các script tiện ích & tài liệu nhóm
 │   ├── 0_yolo_shift_crop.py     # Script YOLOv8 crop phiên bản đầu
 │   ├── build_faiss_only.py      # Build riêng faiss.index từ file features.npy có sẵn
